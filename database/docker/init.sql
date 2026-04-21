@@ -1,8 +1,217 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- ตาราง users
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL UNIQUE,
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username      VARCHAR(50)  UNIQUE NOT NULL,
+    email         VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255)        NOT NULL,
+    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ตาราง user_profiles
+-- ============================================================
+CREATE TABLE user_profiles (
+    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    display_name VARCHAR(50),
+    avatar_url   TEXT,
+    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ENUM TYPES
+-- ============================================================
+CREATE TYPE account_type AS ENUM ('asset', 'liability');
+
+CREATE TYPE account_kind AS ENUM (
+    'cash',
+    'bank_account',
+    'savings',
+    'investment',
+    'e_wallet',
+    'credit_card',
+    'loan'
+);
+
+CREATE TYPE transaction_type AS ENUM (
+    'income',
+    'expense',
+    'transfer'
+);
+
+CREATE TYPE goal_status AS ENUM (
+    'in_progress',
+    'completed',
+    'cancelled'
+);
+
+CREATE TYPE budget_period AS ENUM (
+    'weekly',
+    'monthly',
+    'yearly'
+);
+
+-- ============================================================
+-- ตาราง accounts
+-- ============================================================
+CREATE TABLE accounts (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id    UUID           NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name       VARCHAR(100)   NOT NULL,
+    type       account_type   NOT NULL,
+    kind       account_kind   NOT NULL,
+    balance    NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    currency   CHAR(3)        NOT NULL DEFAULT 'THB',
+    is_active  BOOLEAN        NOT NULL DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+-- ตาราง categories
+-- ============================================================
+CREATE TABLE categories (
+    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id    UUID             REFERENCES users(id) ON DELETE CASCADE,
+    name       VARCHAR(100)     NOT NULL,
+    type       transaction_type NOT NULL,
+    icon       VARCHAR(50),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ตาราง transactions
+-- ============================================================
+CREATE TABLE transactions (
+    id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id          UUID             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id       UUID             NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    to_account_id    UUID             REFERENCES accounts(id),
+    category_id      UUID             REFERENCES categories(id) ON DELETE SET NULL,
+    type             transaction_type NOT NULL,
+    amount           NUMERIC(15, 2)   NOT NULL CHECK (amount > 0),
+    note             TEXT,
+    transaction_date DATE             NOT NULL DEFAULT CURRENT_DATE,
+    created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ตาราง savings_goals
+-- ============================================================
+CREATE TABLE savings_goals (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id        UUID           NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id     UUID           REFERENCES accounts(id) ON DELETE SET NULL,
+    name           VARCHAR(100)   NOT NULL,
+    target_amount  NUMERIC(15, 2) NOT NULL CHECK (target_amount > 0),
+    current_amount NUMERIC(15, 2) NOT NULL DEFAULT 0.00,
+    deadline       DATE,
+    status         goal_status    NOT NULL DEFAULT 'in_progress',
+    note           TEXT,
+    created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ตาราง budgets
+-- ============================================================
+CREATE TABLE budgets (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID           NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    category_id UUID           REFERENCES categories(id) ON DELETE SET NULL,
+    name        VARCHAR(100)   NOT NULL,
+    amount      NUMERIC(15, 2) NOT NULL CHECK (amount > 0),
+    period      budget_period  NOT NULL DEFAULT 'monthly',
+    start_date  DATE           NOT NULL,
+    end_date    DATE,
+    is_active   BOOLEAN        NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_budget_dates CHECK (end_date IS NULL OR end_date >= start_date)
+);
+
+-- ============================================================
+-- INDEXES
+-- ============================================================
+CREATE INDEX idx_users_email           ON users(email);
+CREATE INDEX idx_users_username        ON users(username);
+CREATE INDEX idx_accounts_user_id      ON accounts(user_id);
+CREATE INDEX idx_transactions_user_id  ON transactions(user_id);
+CREATE INDEX idx_transactions_account  ON transactions(account_id);
+CREATE INDEX idx_transactions_date     ON transactions(transaction_date);
+CREATE INDEX idx_savings_goals_user_id ON savings_goals(user_id);
+CREATE INDEX idx_savings_goals_status  ON savings_goals(status);
+CREATE INDEX idx_budgets_user_id       ON budgets(user_id);
+CREATE INDEX idx_budgets_category_id   ON budgets(category_id);
+
+-- ============================================================
+-- FUNCTION + TRIGGER: auto-update updated_at
+-- ============================================================
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_users_updated_at
+    BEFORE UPDATE ON users
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_user_profiles_updated_at
+    BEFORE UPDATE ON user_profiles
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_accounts_updated_at
+    BEFORE UPDATE ON accounts
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_transactions_updated_at
+    BEFORE UPDATE ON transactions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_savings_goals_updated_at
+    BEFORE UPDATE ON savings_goals
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER trg_budgets_updated_at
+    BEFORE UPDATE ON budgets
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================
+-- TRIGGER: สร้าง user_profiles อัตโนมัติเมื่อ insert users
+-- ============================================================
+CREATE OR REPLACE FUNCTION create_user_profile()
+RETURNS TRIGGER AS $$
+BEGIN
+    INSERT INTO user_profiles (user_id)
+    VALUES (NEW.id);
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_create_user_profile
+    AFTER INSERT ON users
+    FOR EACH ROW EXECUTE FUNCTION create_user_profile();
+
+-- ============================================================
+-- DEFAULT CATEGORIES
+-- ============================================================
+INSERT INTO categories (id, user_id, name, type, icon) VALUES
+    (uuid_generate_v4(), NULL, 'เงินเดือน',       'income',  'salary'),
+    (uuid_generate_v4(), NULL, 'รายได้พิเศษ',     'income',  'star'),
+    (uuid_generate_v4(), NULL, 'อาหาร',            'expense', 'food'),
+    (uuid_generate_v4(), NULL, 'เดินทาง',          'expense', 'car'),
+    (uuid_generate_v4(), NULL, 'ที่พัก',           'expense', 'home'),
+    (uuid_generate_v4(), NULL, 'สุขภาพ',           'expense', 'health'),
+    (uuid_generate_v4(), NULL, 'ช้อปปิ้ง',         'expense', 'shopping'),
+    (uuid_generate_v4(), NULL, 'บันเทิง',          'expense', 'entertainment'),
+    (uuid_generate_v4(), NULL, 'บิล/สาธารณูปโภค', 'expense', 'bill'),
+    (uuid_generate_v4(), NULL, 'อื่นๆ',            'expense', 'other');

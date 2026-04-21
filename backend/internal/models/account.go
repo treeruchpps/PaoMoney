@@ -1,0 +1,48 @@
+package models
+
+import "time"
+
+type AccountType string
+type AccountKind string
+
+const (
+	AccountTypeAsset     AccountType = "asset"
+	AccountTypeLiability AccountType = "liability"
+
+	AccountKindCash        AccountKind = "cash"
+	AccountKindBankAccount AccountKind = "bank_account"
+	AccountKindSavings     AccountKind = "savings"
+	AccountKindInvestment  AccountKind = "investment"
+	AccountKindEWallet     AccountKind = "e_wallet"
+	AccountKindCreditCard  AccountKind = "credit_card"
+	AccountKindLoan        AccountKind = "loan"
+)
+
+type Account struct {
+	ID        string      `json:"id"`
+	UserID    string      `json:"user_id"`
+	Name      string      `json:"name"`
+	Type      AccountType `json:"type"`
+	Kind      AccountKind `json:"kind"`
+	Balance   float64     `json:"balance"`
+	Currency  string      `json:"currency"`
+	IsActive  bool        `json:"is_active"`
+	CreatedAt time.Time   `json:"created_at"`
+	UpdatedAt time.Time   `json:"updated_at"`
+}
+
+type CreateAccountRequest struct {
+	Name     string      `json:"name"     binding:"required,max=100"`
+	Type     AccountType `json:"type"     binding:"required,oneof=asset liability"`
+	Kind     AccountKind `json:"kind"     binding:"required"`
+	Balance  float64     `json:"balance"`
+	Currency string      `json:"currency"`
+}
+
+type UpdateAccountRequest struct {
+	Name     *string      `json:"name"`
+	Kind     *AccountKind `json:"kind"`
+	Balance  *float64     `json:"balance"`
+	Currency *string      `json:"currency"`
+	IsActive *bool        `json:"is_active"`
+}

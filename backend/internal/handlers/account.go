@@ -1,0 +1,144 @@
+package handlers
+
+import (
+	"context"
+	"net/http"
+	"paomoney/internal/models"
+
+	"github.com/gin-gonic/gin"
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+type AccountHandler struct {
+	db *pgxpool.Pool
+}
+
+func NewAccountHandler(db *pgxpool.Pool) *AccountHandler {
+	return &AccountHandler{db: db}
+}
+
+// GET /api/v1/accounts
+func (h *AccountHandler) List(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	rows, err := h.db.Query(context.Background(),
+		`SELECT id, user_id, name, type, kind, balance, currency, is_active, created_at, updated_at
+		 FROM accounts WHERE user_id = $1 AND is_active = true ORDER BY created_at ASC`,
+		userID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch accounts"})
+		return
+	}
+	defer rows.Close()
+
+	accounts := []models.Account{}
+	for rows.Next() {
+		var a models.Account
+		if err := rows.Scan(&a.ID, &a.UserID, &a.Name, &a.Type, &a.Kind, &a.Balance, &a.Currency, &a.IsActive, &a.CreatedAt, &a.UpdatedAt); err != nil {
+			continue
+		}
+		accounts = append(accounts, a)
+	}
+
+	c.JSON(http.StatusOK, accounts)
+}
+
+// POST /api/v1/accounts
+func (h *AccountHandler) Create(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req models.CreateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.Currency == "" {
+		req.Currency = "THB"
+	}
+
+	var a models.Account
+	err := h.db.QueryRow(context.Background(),
+		`INSERT INTO accounts (user_id, name, type, kind, balance, currency)
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id, user_id, name, type, kind, balance, currency, is_active, created_at, updated_at`,
+		userID, req.Name, req.Type, req.Kind, req.Balance, req.Currency,
+	).Scan(&a.ID, &a.UserID, &a.Name, &a.Type, &a.Kind, &a.Balance, &a.Currency, &a.IsActive, &a.CreatedAt, &a.UpdatedAt)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create account"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, a)
+}
+
+// GET /api/v1/accounts/:id
+func (h *AccountHandler) Get(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	var a models.Account
+	err := h.db.QueryRow(context.Background(),
+		`SELECT id, user_id, name, type, kind, balance, currency, is_active, created_at, updated_at
+		 FROM accounts WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	).Scan(&a.ID, &a.UserID, &a.Name, &a.Type, &a.Kind, &a.Balance, &a.Currency, &a.IsActive, &a.CreatedAt, &a.UpdatedAt)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, a)
+}
+
+// PUT /api/v1/accounts/:id
+func (h *AccountHandler) Update(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	var req models.UpdateAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var a models.Account
+	err := h.db.QueryRow(context.Background(),
+		`UPDATE accounts
+		 SET name      = COALESCE($1, name),
+		     kind      = COALESCE($2, kind),
+		     balance   = COALESCE($3, balance),
+		     currency  = COALESCE($4, currency),
+		     is_active = COALESCE($5, is_active)
+		 WHERE id = $6 AND user_id = $7
+		 RETURNING id, user_id, name, type, kind, balance, currency, is_active, created_at, updated_at`,
+		req.Name, req.Kind, req.Balance, req.Currency, req.IsActive, id, userID,
+	).Scan(&a.ID, &a.UserID, &a.Name, &a.Type, &a.Kind, &a.Balance, &a.Currency, &a.IsActive, &a.CreatedAt, &a.UpdatedAt)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, a)
+}
+
+// DELETE /api/v1/accounts/:id
+func (h *AccountHandler) Delete(c *gin.Context) {
+	userID := c.GetString("user_id")
+	id := c.Param("id")
+
+	result, err := h.db.Exec(context.Background(),
+		`UPDATE accounts SET is_active = false WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	)
+	if err != nil || result.RowsAffected() == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "account not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "account deleted"})
+}

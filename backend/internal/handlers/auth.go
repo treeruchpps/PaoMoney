@@ -108,6 +108,50 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 }
 
+// PUT /api/v1/auth/change-password
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	userID := c.GetString("user_id")
+
+	var req struct {
+		CurrentPassword string `json:"current_password" binding:"required"`
+		NewPassword     string `json:"new_password"     binding:"required,min=6"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var hash string
+	err := h.db.QueryRow(context.Background(),
+		`SELECT password_hash FROM users WHERE id = $1`, userID,
+	).Scan(&hash)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(req.CurrentPassword)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "รหัสผ่านปัจจุบันไม่ถูกต้อง"})
+		return
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+
+	_, err = h.db.Exec(context.Background(),
+		`UPDATE users SET password_hash = $1 WHERE id = $2`, string(newHash), userID,
+	)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update password"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "เปลี่ยนรหัสผ่านสำเร็จ"})
+}
+
 // POST /api/v1/auth/refresh
 func (h *AuthHandler) Refresh(c *gin.Context) {
 	var req models.RefreshRequest

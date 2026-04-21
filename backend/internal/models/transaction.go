@@ -5,9 +5,10 @@ import "time"
 type TransactionType string
 
 const (
-	TransactionTypeIncome   TransactionType = "income"
-	TransactionTypeExpense  TransactionType = "expense"
-	TransactionTypeTransfer TransactionType = "transfer"
+	TransactionTypeIncome     TransactionType = "income"
+	TransactionTypeExpense    TransactionType = "expense"
+	TransactionTypeTransfer   TransactionType = "transfer"
+	TransactionTypeAdjustment TransactionType = "adjustment"
 )
 
 type Transaction struct {
@@ -18,6 +19,7 @@ type Transaction struct {
 	CategoryID      *string         `json:"category_id"`
 	Type            TransactionType `json:"type"`
 	Amount          float64         `json:"amount"`
+	Name            *string         `json:"name"`
 	Note            *string         `json:"note"`
 	TransactionDate time.Time       `json:"transaction_date"`
 	CreatedAt       time.Time       `json:"created_at"`
@@ -28,8 +30,9 @@ type CreateTransactionRequest struct {
 	AccountID       string          `json:"account_id"       binding:"required"`
 	ToAccountID     *string         `json:"to_account_id"`
 	CategoryID      *string         `json:"category_id"`
-	Type            TransactionType `json:"type"             binding:"required,oneof=income expense transfer"`
+	Type            TransactionType `json:"type"             binding:"required,oneof=income expense transfer adjustment"`
 	Amount          float64         `json:"amount"           binding:"required,gt=0"`
+	Name            *string         `json:"name"`
 	Note            *string         `json:"note"`
 	TransactionDate *string         `json:"transaction_date"`
 }
@@ -37,6 +40,7 @@ type CreateTransactionRequest struct {
 type UpdateTransactionRequest struct {
 	CategoryID      *string  `json:"category_id"`
 	Amount          *float64 `json:"amount"  binding:"omitempty,gt=0"`
+	Name            *string  `json:"name"`
 	Note            *string  `json:"note"`
 	TransactionDate *string  `json:"transaction_date"`
 }

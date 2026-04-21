@@ -42,7 +42,8 @@ CREATE TYPE account_kind AS ENUM (
 CREATE TYPE transaction_type AS ENUM (
     'income',
     'expense',
-    'transfer'
+    'transfer',
+    'adjustment'
 );
 
 CREATE TYPE goal_status AS ENUM (
@@ -82,6 +83,7 @@ CREATE TABLE categories (
     name       VARCHAR(100)     NOT NULL,
     type       transaction_type NOT NULL,
     icon       VARCHAR(50),
+    color      VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -96,6 +98,7 @@ CREATE TABLE transactions (
     category_id      UUID             REFERENCES categories(id) ON DELETE SET NULL,
     type             transaction_type NOT NULL,
     amount           NUMERIC(15, 2)   NOT NULL CHECK (amount > 0),
+    name             VARCHAR(100),
     note             TEXT,
     transaction_date DATE             NOT NULL DEFAULT CURRENT_DATE,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -205,15 +208,20 @@ CREATE TRIGGER trg_create_user_profile
 -- ============================================================
 -- DEFAULT CATEGORIES
 -- ============================================================
-INSERT INTO categories (id, user_id, name, type, icon) VALUES
-    (uuid_generate_v4(), NULL, 'เงินเดือน',       'income',  'salary'),
-    (uuid_generate_v4(), NULL, 'รายได้พิเศษ',     'income',  'star'),
-    (uuid_generate_v4(), NULL, 'อาหาร',            'expense', 'food'),
-    (uuid_generate_v4(), NULL, 'เดินทาง',          'expense', 'car'),
-    (uuid_generate_v4(), NULL, 'ที่พัก',           'expense', 'home'),
-    (uuid_generate_v4(), NULL, 'สุขภาพ',           'expense', 'health'),
-    (uuid_generate_v4(), NULL, 'ช้อปปิ้ง',         'expense', 'shopping'),
-    (uuid_generate_v4(), NULL, 'บันเทิง',          'expense', 'entertainment'),
-    (uuid_generate_v4(), NULL, 'บิล/สาธารณูปโภค', 'expense', 'bill'),
-    (uuid_generate_v4(), NULL, 'อื่นๆ',            'expense', 'other');
-                                                                                                                                             
+INSERT INTO categories (id, user_id, name, type, icon, color) VALUES
+    (uuid_generate_v4(), NULL, 'เงินเดือน',        'income',   'Briefcase',       '#10b981'),
+    (uuid_generate_v4(), NULL, 'รายได้พิเศษ',      'income',   'Star',            '#f59e0b'),
+    (uuid_generate_v4(), NULL, 'ฟรีแลนซ์',         'income',   'Laptop',          '#6366f1'),
+    (uuid_generate_v4(), NULL, 'อาหาร',             'expense',  'UtensilsCrossed', '#f97316'),
+    (uuid_generate_v4(), NULL, 'เดินทาง',           'expense',  'Car',             '#3b82f6'),
+    (uuid_generate_v4(), NULL, 'ที่พัก',            'expense',  'Home',            '#84cc16'),
+    (uuid_generate_v4(), NULL, 'สุขภาพ',            'expense',  'Heart',           '#ef4444'),
+    (uuid_generate_v4(), NULL, 'ช้อปปิ้ง',          'expense',  'ShoppingBag',     '#ec4899'),
+    (uuid_generate_v4(), NULL, 'บันเทิง',           'expense',  'Tv',              '#8b5cf6'),
+    (uuid_generate_v4(), NULL, 'บิล/สาธารณูปโภค',  'expense',  'Zap',             '#eab308'),
+    (uuid_generate_v4(), NULL, 'การศึกษา',          'expense',  'GraduationCap',   '#06b6d4'),
+    (uuid_generate_v4(), NULL, 'อื่นๆ',             'expense',  'Tag',             '#94a3b8'),
+    (uuid_generate_v4(), NULL, 'ชำระบัตรเครดิต',   'transfer', 'CreditCard',      '#ef4444'),
+    (uuid_generate_v4(), NULL, 'โอนเก็บออม',        'transfer', 'PiggyBank',       '#10b981'),
+    (uuid_generate_v4(), NULL, 'ชำระเงินกู้',       'transfer', 'Landmark',        '#f59e0b'),
+    (uuid_generate_v4(), NULL, 'โอนเงิน',           'transfer', 'ArrowLeftRight',  '#6366f1');

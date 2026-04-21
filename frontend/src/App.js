@@ -17,6 +17,7 @@ import TransactionsView from './views/TransactionsView';
 import BudgetsView      from './views/BudgetsView';
 import GoalsView        from './views/GoalsView';
 import CategoriesView   from './views/CategoriesView';
+import ProfileView      from './views/ProfileView';
 
 import { NAV } from './constants/data';
 
@@ -93,15 +94,15 @@ function AppShell() {
   if (appState === 'setup') {
     return (
       <SetupAccountPage
-        onComplete={() => {
-          bootstrap(); // re-bootstrap after setup
-        }}
+        onComplete={() => setAppState('app')}
       />
     );
   }
 
   // ── Full app ──
-  const pageTitle = NAV.find((n) => n.id === view)?.label || '';
+  const pageTitle = view === 'profile'
+    ? 'โปรไฟล์'
+    : NAV.find((n) => n.id === view)?.label || '';
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -113,10 +114,10 @@ function AppShell() {
         setCollapsed={setCollapsed}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar pageTitle={pageTitle} />
+        <Topbar pageTitle={pageTitle} onProfile={() => setView('profile')} />
         <main className="flex-1 overflow-y-auto">
           {view === 'analytics'    && (
-            <AnalyticsView accounts={accounts} />
+            <AnalyticsView accounts={accounts} categories={categories} />
           )}
           {view === 'accounts'     && (
             <AccountsView
@@ -128,16 +129,20 @@ function AppShell() {
             <TransactionsView
               accounts={accounts}
               categories={categories}
+              onRefreshAccounts={refreshAccounts}
             />
           )}
           {view === 'budgets'      && (
             <BudgetsView categories={categories} />
           )}
           {view === 'goals'        && (
-            <GoalsView accounts={accounts} />
+            <GoalsView accounts={accounts} onRefreshAccounts={refreshAccounts} />
           )}
           {view === 'categories'   && (
             <CategoriesView onRefresh={refreshCategories} />
+          )}
+          {view === 'profile'      && (
+            <ProfileView />
           )}
         </main>
       </div>

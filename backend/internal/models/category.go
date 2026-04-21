@@ -8,16 +8,19 @@ type Category struct {
 	Name      string          `json:"name"`
 	Type      TransactionType `json:"type"`
 	Icon      *string         `json:"icon"`
+	Color     *string         `json:"color"`
 	CreatedAt time.Time       `json:"created_at"`
 }
 
 type CreateCategoryRequest struct {
-	Name string          `json:"name" binding:"required,max=100"`
-	Type TransactionType `json:"type" binding:"required,oneof=income expense"`
-	Icon *string         `json:"icon"`
+	Name  string          `json:"name"  binding:"required,max=100"`
+	Type  TransactionType `json:"type"  binding:"required,oneof=income expense transfer"`
+	Icon  *string         `json:"icon"`
+	Color *string         `json:"color"`
 }
 
 type UpdateCategoryRequest struct {
-	Name *string  `json:"name"`
-	Icon *string  `json:"icon"`
+	Name  *string `json:"name"`
+	Icon  *string `json:"icon"`
+	Color *string `json:"color"`
 }

@@ -17,12 +17,12 @@ func NewCategoryHandler(db *pgxpool.Pool) *CategoryHandler {
 	return &CategoryHandler{db: db}
 }
 
-// GET /api/v1/categories  (default + ของ user)
+// GET /api/v1/categories
 func (h *CategoryHandler) List(c *gin.Context) {
-	userID := c.GetString("user_id")
-	typeFilter := c.Query("type") // income | expense | (all)
+	userID     := c.GetString("user_id")
+	typeFilter := c.Query("type")
 
-	query := `SELECT id, user_id, name, type, icon, created_at
+	query := `SELECT id, user_id, name, type, icon, color, created_at
 			  FROM categories
 			  WHERE (user_id = $1 OR user_id IS NULL)`
 	args := []interface{}{userID}
@@ -43,7 +43,8 @@ func (h *CategoryHandler) List(c *gin.Context) {
 	categories := []models.Category{}
 	for rows.Next() {
 		var cat models.Category
-		if err := rows.Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type, &cat.Icon, &cat.CreatedAt); err != nil {
+		if err := rows.Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type,
+			&cat.Icon, &cat.Color, &cat.CreatedAt); err != nil {
 			continue
 		}
 		categories = append(categories, cat)
@@ -64,11 +65,12 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 
 	var cat models.Category
 	err := h.db.QueryRow(context.Background(),
-		`INSERT INTO categories (user_id, name, type, icon)
-		 VALUES ($1, $2, $3, $4)
-		 RETURNING id, user_id, name, type, icon, created_at`,
-		userID, req.Name, req.Type, req.Icon,
-	).Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type, &cat.Icon, &cat.CreatedAt)
+		`INSERT INTO categories (user_id, name, type, icon, color)
+		 VALUES ($1, $2, $3, $4, $5)
+		 RETURNING id, user_id, name, type, icon, color, created_at`,
+		userID, req.Name, req.Type, req.Icon, req.Color,
+	).Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type,
+		&cat.Icon, &cat.Color, &cat.CreatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create category"})
@@ -81,7 +83,7 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 // PUT /api/v1/categories/:id
 func (h *CategoryHandler) Update(c *gin.Context) {
 	userID := c.GetString("user_id")
-	id := c.Param("id")
+	id     := c.Param("id")
 
 	var req models.UpdateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,12 +94,14 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	var cat models.Category
 	err := h.db.QueryRow(context.Background(),
 		`UPDATE categories
-		 SET name = COALESCE($1, name),
-		     icon = COALESCE($2, icon)
-		 WHERE id = $3 AND user_id = $4
-		 RETURNING id, user_id, name, type, icon, created_at`,
-		req.Name, req.Icon, id, userID,
-	).Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type, &cat.Icon, &cat.CreatedAt)
+		 SET name  = COALESCE($1, name),
+		     icon  = COALESCE($2, icon),
+		     color = COALESCE($3, color)
+		 WHERE id = $4 AND user_id = $5
+		 RETURNING id, user_id, name, type, icon, color, created_at`,
+		req.Name, req.Icon, req.Color, id, userID,
+	).Scan(&cat.ID, &cat.UserID, &cat.Name, &cat.Type,
+		&cat.Icon, &cat.Color, &cat.CreatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "category not found or not editable"})
@@ -110,7 +114,7 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 // DELETE /api/v1/categories/:id
 func (h *CategoryHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
-	id := c.Param("id")
+	id     := c.Param("id")
 
 	result, err := h.db.Exec(context.Background(),
 		`DELETE FROM categories WHERE id = $1 AND user_id = $2`,

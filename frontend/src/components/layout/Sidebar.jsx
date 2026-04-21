@@ -56,16 +56,19 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
 
       {/* Bottom */}
       <div className="px-2 pb-4 space-y-0.5">
-        <button className="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400">
-          <Icon name="Settings" size={17} />
-          {!collapsed && <span>ตั้งค่า</span>}
-        </button>
         <button
           onClick={() => setCollapsed((c) => !c)}
           className="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400"
         >
           <Icon name="Menu" size={17} />
           {!collapsed && <span>ย่อแถบเมนู</span>}
+        </button>
+        <button
+          onClick={logout}
+          className="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-red-500 transition-colors"
+        >
+          <Icon name="LogOut" size={17} />
+          {!collapsed && <span>ออกจากระบบ</span>}
         </button>
       </div>
     </aside>

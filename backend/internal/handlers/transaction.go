@@ -28,8 +28,11 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	if page < 1 {
 		page = 1
 	}
-	if limit < 1 || limit > 100 {
+	if limit < 1 {
 		limit = 20
+	}
+	if limit > 10000 {
+		limit = 10000
 	}
 	offset := (page - 1) * limit
 
@@ -38,7 +41,7 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 
-	query := `SELECT id, user_id, account_id, to_account_id, category_id, type, amount, note, transaction_date, created_at, updated_at
+	query := `SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at
 			  FROM transactions WHERE user_id = $1`
 	args := []interface{}{userID}
 	idx := 2
@@ -79,7 +82,7 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var t models.Transaction
 		if err := rows.Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-			&t.Type, &t.Amount, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			continue
 		}
 		transactions = append(transactions, t)
@@ -93,6 +96,7 @@ func (h *TransactionHandler) List(c *gin.Context) {
 }
 
 // POST /api/v1/transactions
+// สร้าง transaction พร้อมอัปเดต balance ของบัญชีใน DB transaction เดียวกัน
 func (h *TransactionHandler) Create(c *gin.Context) {
 	userID := c.GetString("user_id")
 
@@ -112,17 +116,89 @@ func (h *TransactionHandler) Create(c *gin.Context) {
 		txDate = parsed
 	}
 
-	var t models.Transaction
-	err := h.db.QueryRow(context.Background(),
-		`INSERT INTO transactions (user_id, account_id, to_account_id, category_id, type, amount, note, transaction_date)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, note, transaction_date, created_at, updated_at`,
-		userID, req.AccountID, req.ToAccountID, req.CategoryID, req.Type, req.Amount, req.Note, txDate,
-	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
+	// เริ่ม DB transaction
+	ctx := context.Background()
+	dbTx, err := h.db.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
+		return
+	}
+	defer dbTx.Rollback(ctx)
 
+	// Insert transaction record
+	var t models.Transaction
+	err = dbTx.QueryRow(ctx,
+		`INSERT INTO transactions (user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at`,
+		userID, req.AccountID, req.ToAccountID, req.CategoryID, req.Type, req.Amount, req.Name, req.Note, txDate,
+	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create transaction"})
+		return
+	}
+
+	// อัปเดต balance ตามประเภท
+	switch req.Type {
+	case models.TransactionTypeIncome:
+		// รายรับ: เพิ่ม balance
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+			req.Amount, req.AccountID, userID,
+		)
+	case models.TransactionTypeExpense:
+		// รายจ่าย: ลด balance
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+			req.Amount, req.AccountID, userID,
+		)
+	case models.TransactionTypeTransfer:
+		// โอนเงิน: ลดจากต้นทางเสมอ
+		if req.ToAccountID == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "to_account_id required for transfer"})
+			return
+		}
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+			req.Amount, req.AccountID, userID,
+		)
+		if err == nil {
+			// ตรวจสอบประเภทบัญชีปลายทาง:
+			// asset  → รับเงิน = เพิ่ม balance
+			// liability → ชำระหนี้ = ลด balance
+			var toAccType string
+			err = dbTx.QueryRow(ctx,
+				`SELECT type FROM accounts WHERE id = $1 AND user_id = $2`,
+				*req.ToAccountID, userID,
+			).Scan(&toAccType)
+			if err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "destination account not found"})
+				return
+			}
+			if toAccType == "liability" {
+				_, err = dbTx.Exec(ctx,
+					`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+					req.Amount, *req.ToAccountID, userID,
+				)
+			} else {
+				_, err = dbTx.Exec(ctx,
+					`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+					req.Amount, *req.ToAccountID, userID,
+				)
+			}
+		}
+	case models.TransactionTypeAdjustment:
+		// ปรับยอด: บันทึกเพื่อ audit trail เท่านั้น ไม่เปลี่ยน balance
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update account balance"})
+		return
+	}
+
+	if err := dbTx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transaction"})
 		return
 	}
 
@@ -136,11 +212,11 @@ func (h *TransactionHandler) Get(c *gin.Context) {
 
 	var t models.Transaction
 	err := h.db.QueryRow(context.Background(),
-		`SELECT id, user_id, account_id, to_account_id, category_id, type, amount, note, transaction_date, created_at, updated_at
+		`SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at
 		 FROM transactions WHERE id = $1 AND user_id = $2`,
 		id, userID,
 	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
@@ -176,13 +252,14 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 		`UPDATE transactions
 		 SET category_id      = COALESCE($1, category_id),
 		     amount           = COALESCE($2, amount),
-		     note             = COALESCE($3, note),
-		     transaction_date = COALESCE($4, transaction_date)
-		 WHERE id = $5 AND user_id = $6
-		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, note, transaction_date, created_at, updated_at`,
-		req.CategoryID, req.Amount, req.Note, txDate, id, userID,
+		     name             = COALESCE($3, name),
+		     note             = COALESCE($4, note),
+		     transaction_date = COALESCE($5, transaction_date)
+		 WHERE id = $6 AND user_id = $7
+		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at`,
+		req.CategoryID, req.Amount, req.Name, req.Note, txDate, id, userID,
 	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
@@ -193,16 +270,93 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 }
 
 // DELETE /api/v1/transactions/:id
+// ลบ transaction พร้อม reverse balance กลับ
 func (h *TransactionHandler) Delete(c *gin.Context) {
 	userID := c.GetString("user_id")
 	id := c.Param("id")
 
-	result, err := h.db.Exec(context.Background(),
-		`DELETE FROM transactions WHERE id = $1 AND user_id = $2`,
+	ctx := context.Background()
+
+	// ดึงข้อมูล transaction ก่อน เพื่อจะได้ reverse balance ถูก
+	var t models.Transaction
+	err := h.db.QueryRow(ctx,
+		`SELECT id, user_id, account_id, to_account_id, type, amount FROM transactions WHERE id = $1 AND user_id = $2`,
 		id, userID,
-	)
+	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.Type, &t.Amount)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	// เริ่ม DB transaction
+	dbTx, err := h.db.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
+		return
+	}
+	defer dbTx.Rollback(ctx)
+
+	// ลบ transaction
+	result, err := dbTx.Exec(ctx, `DELETE FROM transactions WHERE id = $1 AND user_id = $2`, id, userID)
 	if err != nil || result.RowsAffected() == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	// Reverse balance
+	switch t.Type {
+	case models.TransactionTypeIncome:
+		// คืน balance (เคยบวก ก็ลบคืน)
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+			t.Amount, t.AccountID, userID,
+		)
+	case models.TransactionTypeExpense:
+		// คืน balance (เคยลบ ก็บวกคืน)
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+			t.Amount, t.AccountID, userID,
+		)
+	case models.TransactionTypeTransfer:
+		if t.ToAccountID != nil {
+			// คืน balance ต้นทาง (เคยลบ ก็บวกคืน)
+			_, err = dbTx.Exec(ctx,
+				`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+				t.Amount, t.AccountID, userID,
+			)
+			if err == nil {
+				// คืน balance ปลายทาง — ตรวจสอบประเภทก่อน reverse
+				var toAccType string
+				_ = dbTx.QueryRow(ctx,
+					`SELECT type FROM accounts WHERE id = $1 AND user_id = $2`,
+					*t.ToAccountID, userID,
+				).Scan(&toAccType)
+				if toAccType == "liability" {
+					// เคยลด liability ก็บวกคืน
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+						t.Amount, *t.ToAccountID, userID,
+					)
+				} else {
+					// เคยบวก asset ก็ลบคืน
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+						t.Amount, *t.ToAccountID, userID,
+					)
+				}
+			}
+		}
+	case models.TransactionTypeAdjustment:
+		// ปรับยอด: ไม่มี balance ที่ต้อง reverse
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reverse account balance"})
+		return
+	}
+
+	if err := dbTx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit"})
 		return
 	}
 

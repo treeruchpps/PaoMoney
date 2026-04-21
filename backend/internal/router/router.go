@@ -50,6 +50,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		// Profile
 		protected.GET("/profile", profileH.GetProfile)
 		protected.PUT("/profile", profileH.UpdateProfile)
+		protected.PUT("/auth/change-password", authH.ChangePassword)
 
 		// Accounts
 		protected.GET("/accounts",     accountH.List)
@@ -72,11 +73,12 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		protected.DELETE("/transactions/:id", txH.Delete)
 
 		// Savings Goals
-		protected.GET("/savings-goals",     goalH.List)
-		protected.POST("/savings-goals",    goalH.Create)
-		protected.GET("/savings-goals/:id", goalH.Get)
-		protected.PUT("/savings-goals/:id", goalH.Update)
-		protected.DELETE("/savings-goals/:id", goalH.Delete)
+		protected.GET("/savings-goals",              goalH.List)
+		protected.POST("/savings-goals",             goalH.Create)
+		protected.GET("/savings-goals/:id",          goalH.Get)
+		protected.PUT("/savings-goals/:id",          goalH.Update)
+		protected.DELETE("/savings-goals/:id",       goalH.Delete)
+		protected.POST("/savings-goals/:id/deposit", goalH.Deposit)
 
 		// Budgets
 		protected.GET("/budgets",     budgetH.List)

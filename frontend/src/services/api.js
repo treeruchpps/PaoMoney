@@ -75,6 +75,9 @@ export const auth = {
 
   refresh: (refreshToken) =>
     request('/auth/refresh', { method: 'POST', body: JSON.stringify({ refresh_token: refreshToken }) }),
+
+  changePassword: (body) =>
+    request('/auth/change-password', { method: 'PUT', body: JSON.stringify(body) }),
 };
 
 // ====================================================
@@ -131,11 +134,12 @@ export const transactions = {
 // SAVINGS GOALS
 // ====================================================
 export const savingsGoals = {
-  list:   ()         => request('/savings-goals'),
-  create: (body)     => request('/savings-goals',     { method: 'POST',   body: JSON.stringify(body) }),
-  get:    (id)       => request(`/savings-goals/${id}`),
-  update: (id, body) => request(`/savings-goals/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  delete: (id)       => request(`/savings-goals/${id}`, { method: 'DELETE' }),
+  list:    ()         => request('/savings-goals'),
+  create:  (body)     => request('/savings-goals',              { method: 'POST',   body: JSON.stringify(body) }),
+  get:     (id)       => request(`/savings-goals/${id}`),
+  update:  (id, body) => request(`/savings-goals/${id}`,        { method: 'PUT',    body: JSON.stringify(body) }),
+  delete:  (id)       => request(`/savings-goals/${id}`,        { method: 'DELETE' }),
+  deposit: (id, body) => request(`/savings-goals/${id}/deposit`,{ method: 'POST',   body: JSON.stringify(body) }),
 };
 
 // ====================================================

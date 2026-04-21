@@ -20,6 +20,7 @@ type Budget struct {
 	StartDate  time.Time    `json:"start_date"`
 	EndDate    *time.Time   `json:"end_date"`
 	IsActive   bool         `json:"is_active"`
+	Spent      float64      `json:"spent"`
 	CreatedAt  time.Time    `json:"created_at"`
 	UpdatedAt  time.Time    `json:"updated_at"`
 }

@@ -15,12 +15,13 @@ CREATE TABLE users (
 -- ตาราง user_profiles
 -- ============================================================
 CREATE TABLE user_profiles (
-    id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id      UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    display_name VARCHAR(50),
-    avatar_url   TEXT,
-    created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id        UUID UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    display_name   VARCHAR(50),
+    avatar_url     TEXT,
+    week_start_day SMALLINT NOT NULL DEFAULT 1,  -- 0=อาทิตย์, 1=จันทร์, 6=เสาร์
+    created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ============================================================
@@ -215,3 +216,4 @@ INSERT INTO categories (id, user_id, name, type, icon) VALUES
     (uuid_generate_v4(), NULL, 'บันเทิง',          'expense', 'entertainment'),
     (uuid_generate_v4(), NULL, 'บิล/สาธารณูปโภค', 'expense', 'bill'),
     (uuid_generate_v4(), NULL, 'อื่นๆ',            'expense', 'other');
+                                                                                                                                             

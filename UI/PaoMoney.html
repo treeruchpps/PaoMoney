@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PaoMoney – จัดการการเงินส่วนตัว</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.447.0/dist/umd/lucide.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { font-family: 'Sarabun', sans-serif; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #f1f5f9; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  .sidebar-item { transition: all 0.18s ease; }
+  .sidebar-item:hover { background: rgba(99,102,241,0.10); }
+  .sidebar-item.active { background: linear-gradient(90deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.04) 100%); border-left: 3px solid #6366f1; }
+  .card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.09); }
+  .progress-bar { transition: width 0.6s ease; }
+  .modal-bg { animation: fadeIn 0.15s ease; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .modal-box { animation: slideUp 0.2s ease; }
+  @keyframes slideUp { from { transform: translateY(20px); opacity:0; } to { transform: translateY(0); opacity:1; } }
+  .btn-primary { background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%); transition: opacity 0.15s; }
+  .btn-primary:hover { opacity: 0.88; }
+  .badge { font-size: 11px; }
+  .donut-segment { transition: stroke-dashoffset 0.6s ease; }
+  input, select { outline: none; }
+  input:focus, select:focus { box-shadow: 0 0 0 2px rgba(99,102,241,0.35); }
+</style>
+<script>tailwind.config = { theme: { extend: { colors: { indigo: { 50:'#eef2ff',100:'#e0e7ff',200:'#c7d2fe',300:'#a5b4fc',400:'#818cf8',500:'#6366f1',600:'#4f46e5',700:'#4338ca' } } } } }</script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ─── MOCK DATA ──────────────────────────────────────────────
+const INITIAL_ACCOUNTS = [
+  { id:1, name:'เงินสด', type:'cash', color:'#10b981', icon:'Wallet', balance:8500, initial:10000 },
+  { id:2, name:'กสิกรไทย', type:'bank', color:'#6366f1', icon:'Building2', balance:42300, initial:40000 },
+  { id:3, name:'บัตรเครดิต KTC', type:'credit', color:'#f59e0b', icon:'CreditCard', balance:-12500, initial:0 },
+  { id:4, name:'ออมทรัพย์', type:'bank', color:'#3b82f6', icon:'PiggyBank', balance:95000, initial:80000 },
+];
+
+const CATEGORIES = {
+  expense: [
+    { id:'food', name:'อาหาร', icon:'UtensilsCrossed', color:'#f97316' },
+    { id:'transport', name:'เดินทาง', icon:'Car', color:'#3b82f6' },
+    { id:'shopping', name:'ช้อปปิ้ง', icon:'ShoppingBag', color:'#ec4899' },
+    { id:'entertainment', name:'บันเทิง', icon:'Tv', color:'#8b5cf6' },
+    { id:'health', name:'สุขภาพ', icon:'Heart', color:'#ef4444' },
+    { id:'utility', name:'ค่าสาธารณูปโภค', icon:'Zap', color:'#eab308' },
+    { id:'education', name:'การศึกษา', icon:'GraduationCap', color:'#06b6d4' },
+    { id:'housing', name:'ที่พัก', icon:'Home', color:'#84cc16' },
+    { id:'other_exp', name:'อื่นๆ', icon:'MoreHorizontal', color:'#94a3b8' },
+  ],
+  income: [
+    { id:'salary', name:'เงินเดือน', icon:'Briefcase', color:'#10b981' },
+    { id:'freelance', name:'ฟรีแลนซ์', icon:'Laptop', color:'#6366f1' },
+    { id:'investment', name:'การลงทุน', icon:'TrendingUp', color:'#f59e0b' },
+    { id:'gift', name:'ของขวัญ', icon:'Gift', color:'#ec4899' },
+    { id:'other_inc', name:'รายได้อื่นๆ', icon:'Plus', color:'#06b6d4' },
+  ]
+};
+
+const INITIAL_TRANSACTIONS = [
+  { id:1, date:'2026-04-19', type:'expense', category:'food', account:2, amount:320, note:'ข้าวกลางวัน' },
+  { id:2, date:'2026-04-18', type:'expense', category:'transport', account:1, amount:85, note:'แกร็บ' },
+  { id:3, date:'2026-04-18', type:'income', category:'salary', account:2, amount:35000, note:'เงินเดือนเดือนเมษา' },
+  { id:4, date:'2026-04-17', type:'expense', category:'shopping', account:3, amount:2500, note:'ซื้อเสื้อผ้า' },
+  { id:5, date:'2026-04-17', type:'expense', category:'food', account:1, amount:150, note:'กาแฟ+เบเกอรี่' },
+  { id:6, date:'2026-04-16', type:'expense', category:'entertainment', account:3, amount:899, note:'Netflix' },
+  { id:7, date:'2026-04-15', type:'transfer', fromAccount:2, toAccount:4, amount:5000, note:'โอนเก็บออม', date:'2026-04-15' },
+  { id:8, date:'2026-04-14', type:'expense', category:'health', account:2, amount:650, note:'หมอฟัน' },
+  { id:9, date:'2026-04-13', type:'expense', category:'utility', account:2, amount:1200, note:'ค่าไฟฟ้า' },
+  { id:10, date:'2026-04-12', type:'income', category:'freelance', account:2, amount:8000, note:'งาน design' },
+  { id:11, date:'2026-04-11', type:'expense', category:'food', account:1, amount:420, note:'ซื้อของที่ตลาด' },
+  { id:12, date:'2026-04-10', type:'expense', category:'shopping', account:3, amount:3200, note:'Amazon' },
+];
+
+const BUDGETS = [
+  { id:1, category:'food', limit:8000, spent:5240 },
+  { id:2, category:'transport', limit:3000, spent:2450 },
+  { id:3, category:'shopping', limit:5000, spent:5700 },
+  { id:4, category:'entertainment', limit:2000, spent:899 },
+  { id:5, category:'health', limit:2000, spent:650 },
+  { id:6, category:'utility', limit:2500, spent:1200 },
+];
+
+const GOALS = [
+  { id:1, name:'โทรศัพท์ใหม่', target:35000, saved:18500, deadline:'2026-08-01', account:4, icon:'Smartphone', color:'#6366f1' },
+  { id:2, name:'ท่องเที่ยวญี่ปุ่น', target:80000, saved:24000, deadline:'2026-12-01', account:4, icon:'Plane', color:'#f59e0b' },
+  { id:3, name:'กองทุนฉุกเฉิน', target:100000, saved:95000, deadline:'2026-06-01', account:2, icon:'Shield', color:'#10b981' },
+  { id:4, name:'คอมพิวเตอร์ใหม่', target:45000, saved:9000, deadline:'2027-01-01', account:4, icon:'Monitor', color:'#3b82f6' },
+];
+
+// ─── HELPERS ───────────────────────────────────────────────
+const fmt = (n) => new Intl.NumberFormat('th-TH').format(Math.abs(n));
+const fmtSigned = (n) => (n < 0 ? '-' : '') + fmt(n);
+const getCat = (id, type='expense') => [...CATEGORIES.expense, ...CATEGORIES.income].find(c => c.id === id) || { name:'โอน', icon:'ArrowLeftRight', color:'#94a3b8' };
+const getMonthsLeft = (deadline) => {
+  const d = new Date(deadline), now = new Date();
+  return Math.max(1, Math.ceil((d - now) / (1000*60*60*24*30)));
+};
+
+// ─── ICON COMPONENT ───────────────────────────────────────
+function Icon({ name, size=18, color, className='' }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current && window.lucide) {
+      ref.current.innerHTML = '';
+      const icons = window.lucide;
+      const iconFn = icons[name] || icons['Circle'];
+      if (iconFn) {
+        const svg = iconFn[2]; // SVG path data
+        ref.current.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color||'currentColor'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svg ? svg.map(s => `<${s[0]} ${Object.entries(s[1]||{}).map(([k,v])=>`${k}="${v}"`).join(' ')}></${s[0]}>`).join('') : ''}</svg>`;
+      }
+    }
+  }, [name, size, color]);
+  return <span ref={ref} className={`inline-flex items-center justify-center ${className}`} />;
+}
+
+// Better icon using img-based SVG sprite approach
+function LIcon({ name, size=18, color='currentColor', className='' }) {
+  const iconMap = {
+    Wallet: 'M20 12V22H4V12M22 7H2V12H22V7ZM12 22V7M12 7H7.5C6.83696 7 6.20107 6.73661 5.73223 6.26777C5.26339 5.79893 5 5.16304 5 4.5C5 3.83696 5.26339 3.20107 5.73223 2.73223C6.20107 2.26339 6.83696 2 7.5 2C11 2 12 7 12 7ZM12 7H16.5C17.163 7 17.7989 6.73661 18.2678 6.26777C18.7366 5.79893 19 5.16304 19 4.5C19 3.83696 18.7366 3.20107 18.2678 2.73223C17.7989 2.26339 17.163 2 16.5 2C13 2 12 7 12 7Z',
+    Building2: 'M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18ZM6 12H4a2 2 0 0 0-2 2v8h4M18 9h2a2 2 0 0 1 2 2v11h-4M10 6h4M10 10h4M10 14h4M10 18h4',
+    CreditCard: 'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM2 10h20',
+    PiggyBank: 'M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8.5 3.3 1.5 4.5.5.7.5 1.5.5 2 0 1 0 1.5.5 2 .5.5 1 .5 1.5.5h6c.5 0 1 0 1.5-.5s.5-1 .5-2v-.5c1.5-.5 3-1.5 3.5-3H21c1.1 0 2-.9 2-2v-2c0-1.1-.9-2-2-2h-1c-.5-1-1.5-2-3-2.5M8 15h.01',
+    LayoutDashboard: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10',
+    ArrowLeftRight: 'M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4',
+    Plus: 'M12 5v14M5 12h14',
+    Edit: 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7 M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z',
+    Trash2: 'M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6',
+    TrendingUp: 'M23 6l-9.5 9.5-5-5L1 18M17 6h6v6',
+    TrendingDown: 'M23 18l-9.5-9.5-5 5L1 6M17 18h6v-6',
+    Target: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10zM12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+    Filter: 'M22 3H2l8 9.46V19l4 2v-8.54L22 3z',
+    ChevronDown: 'M6 9l6 6 6-6',
+    ChevronRight: 'M9 18l6-6-6-6',
+    X: 'M18 6L6 18M6 6l12 12',
+    Check: 'M20 6L9 17l-5-5',
+    Calendar: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18',
+    BarChart2: 'M18 20V10M12 20V4M6 20v-6',
+    PieChart: 'M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z',
+    DollarSign: 'M12 2v20M17 5H9.5a3.5 3.5 0 1 0 0 7h5a3.5 3.5 0 1 1 0 7H6',
+    UtensilsCrossed: 'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2l-5 5 5 5M21 21H6.9c-.9 0-1.8-.4-2.4-1L2 17',
+    Car: 'M5 17H3v-4l2-5h14l2 5v4h-2M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0zM15 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0z',
+    ShoppingBag: 'M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4ZM3 6h18M16 10a4 4 0 0 1-8 0',
+    Tv: 'M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2ZM7 21h10M12 17v4',
+    Heart: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z',
+    Zap: 'M13 2 3 14h9l-1 8 10-12h-9l1-8z',
+    GraduationCap: 'M22 10v6M2 10l10-5 10 5-10 5-10-5zM6 12v5c0 2 2 3 6 3s6-1 6-3v-5',
+    Home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10',
+    MoreHorizontal: 'M12 12h.01M19 12h.01M5 12h.01',
+    Briefcase: 'M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2ZM16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2',
+    Laptop: 'M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55a1 1 0 0 1-.9 1.45H3.62a1 1 0 0 1-.9-1.45L4 16',
+    Gift: 'M20 12v10H4V12M22 7H2v5h20V7zM12 22V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z',
+    Smartphone: 'M17 2H7a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2zM12 18h.01',
+    Plane: 'M17.8 19.2 16 11l3.5-3.5C21 6 21 4 19 4c-1 0-2 1-3.5 2.5L11 10 2.8 8.2c-.5-.1-.9.4-.8.9l.9 2.5C3.3 12.2 4 13 5 13h2l2 5h3l.8-2.1a.5.5 0 0 1 .9 0L14.5 18h3.3z',
+    Shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',
+    Monitor: 'M20 3H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8 21h8M12 17v4',
+    Bell: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
+    Settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
+    LogOut: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+    Search: 'M11 17.25a6.25 6.25 0 1 1 0-12.5 6.25 6.25 0 0 1 0 12.5zM16 16l4.5 4.5',
+    ArrowUp: 'M12 19V5M5 12l7-7 7 7',
+    ArrowDown: 'M12 5v14M5 12l7 7 7-7',
+    Circle: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20z',
+    Menu: 'M3 12h18M3 6h18M3 18h18',
+    Tag: 'M12 2H2v10l9.29 9.29a1 1 0 0 0 1.41 0l8.58-8.58a1 1 0 0 0 0-1.41L12 2zM7 7h.01',
+  };
+  const d = iconMap[name] || iconMap['Circle'];
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`inline-block flex-shrink-0 ${className}`}>
+      {d.split('M').filter(Boolean).map((seg, i) => (
+        <path key={i} d={`M${seg}`} />
+      ))}
+    </svg>
+  );
+}
+
+// ─── MODAL ───────────────────────────────────────────────
+function Modal({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center modal-bg" style={{background:'rgba(15,23,42,0.45)'}}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 modal-box">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h3 className="text-base font-semibold text-slate-800">{title}</h3>
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+            <LIcon name="X" size={18} />
+          </button>
+        </div>
+        <div className="px-6 py-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── DONUT CHART ─────────────────────────────────────────
+function DonutChart({ data, size=180 }) {
+  const total = data.reduce((s,d) => s+d.value, 0);
+  let cumulative = 0;
+  const cx = size/2, cy = size/2, r = size*0.38, innerR = size*0.22;
+  const segments = data.map(d => {
+    const pct = d.value / total;
+    const startAngle = cumulative * 2 * Math.PI - Math.PI/2;
+    cumulative += pct;
+    const endAngle = cumulative * 2 * Math.PI - Math.PI/2;
+    const x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle), y2 = cy + r * Math.sin(endAngle);
+    const ix1 = cx + innerR * Math.cos(startAngle), iy1 = cy + innerR * Math.sin(startAngle);
+    const ix2 = cx + innerR * Math.cos(endAngle), iy2 = cy + innerR * Math.sin(endAngle);
+    const large = pct > 0.5 ? 1 : 0;
+    const path = `M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${large} 0 ${ix1} ${iy1} Z`;
+    return { ...d, path, pct };
+  });
+  return (
+    <svg width={size} height={size}>
+      {segments.map((s,i) => (
+        <path key={i} d={s.path} fill={s.color} opacity="0.9" className="cursor-pointer hover:opacity-100 transition-opacity" />
+      ))}
+      <circle cx={cx} cy={cy} r={innerR-2} fill="white" />
+      <text x={cx} y={cy-6} textAnchor="middle" fontSize="11" fill="#64748b" fontFamily="Sarabun">รายจ่าย</text>
+      <text x={cx} y={cy+10} textAnchor="middle" fontSize="13" fontWeight="700" fill="#1e293b" fontFamily="Sarabun">{fmt(total)}</text>
+      <text x={cx} y={cy+24} textAnchor="middle" fontSize="10" fill="#94a3b8" fontFamily="Sarabun">บาท</text>
+    </svg>
+  );
+}
+
+// ─── BAR CHART ───────────────────────────────────────────
+function BarChart({ data }) {
+  const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense)));
+  const W=320, H=160, padL=10, padR=10, padT=10, padB=30;
+  const chartW = W - padL - padR, chartH = H - padT - padB;
+  const barW = (chartW / data.length) * 0.35;
+  const gap = (chartW / data.length) * 0.1;
+  return (
+    <svg width="100%" viewBox={`0 0 ${W} ${H}`}>
+      {[0, 0.25, 0.5, 0.75, 1].map((t, i) => (
+        <line key={i} x1={padL} x2={W-padR} y1={padT + chartH*(1-t)} y2={padT + chartH*(1-t)} stroke="#e2e8f0" strokeWidth="1" />
+      ))}
+      {data.map((d, i) => {
+        const x = padL + (chartW / data.length) * i + gap;
+        const incH = (d.income / maxVal) * chartH;
+        const expH = (d.expense / maxVal) * chartH;
+        return (
+          <g key={i}>
+            <rect x={x} y={padT + chartH - incH} width={barW} height={incH} fill="#10b981" rx="3" opacity="0.85" />
+            <rect x={x + barW + 3} y={padT + chartH - expH} width={barW} height={expH} fill="#f43f5e" rx="3" opacity="0.85" />
+            <text x={x + barW} y={H - 8} textAnchor="middle" fontSize="9" fill="#94a3b8" fontFamily="Sarabun">{d.month}</text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ─── ACCOUNTS VIEW ────────────────────────────────────────
+function AccountsView({ accounts, setAccounts }) {
+  const [showModal, setShowModal] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({ name:'', type:'cash', color:'#6366f1', icon:'Wallet', balance:'', initial:'' });
+  const iconOptions = ['Wallet','Building2','CreditCard','PiggyBank'];
+  const typeLabels = { cash:'เงินสด', bank:'บัญชีธนาคาร', credit:'บัตรเครดิต' };
+  const totalAssets = accounts.filter(a => a.balance > 0).reduce((s,a) => s+a.balance, 0);
+  const totalLiab = accounts.filter(a => a.balance < 0).reduce((s,a) => s+a.balance, 0);
+
+  const openCreate = () => { setEditing(null); setForm({ name:'', type:'cash', color:'#6366f1', icon:'Wallet', balance:'', initial:'' }); setShowModal(true); };
+  const openEdit = (acc) => { setEditing(acc); setForm({ ...acc, balance: String(acc.balance), initial: String(acc.initial) }); setShowModal(true); };
+  const save = () => {
+    if (!form.name || form.balance === '') return;
+    if (editing) {
+      setAccounts(a => a.map(x => x.id===editing.id ? {...form, id:editing.id, balance:parseFloat(form.balance), initial:parseFloat(form.initial||0)} : x));
+    } else {
+      setAccounts(a => [...a, { ...form, id: Date.now(), balance: parseFloat(form.balance), initial: parseFloat(form.initial||0) }]);
+    }
+    setShowModal(false);
+  };
+  const del = (id) => setAccounts(a => a.filter(x => x.id !== id));
+
+  const colorOptions = ['#10b981','#6366f1','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#06b6d4'];
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label:'สินทรัพย์รวม', value: totalAssets, color:'#10b981', bg:'#f0fdf4' },
+          { label:'หนี้สินรวม', value: Math.abs(totalLiab), color:'#ef4444', bg:'#fff1f2' },
+          { label:'มูลค่าสุทธิ', value: totalAssets+totalLiab, color:'#6366f1', bg:'#eef2ff' },
+        ].map((s,i) => (
+          <div key={i} className="rounded-2xl p-4 card-hover" style={{background:s.bg}}>
+            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
+            <p className="text-xl font-bold" style={{color:s.color}}>฿{fmt(s.value)}</p>
+          </div>
+        ))}
+      </div>
+      {/* Accounts */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-slate-700">บัญชีทั้งหมด</h2>
+        <button onClick={openCreate} className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
+          <LIcon name="Plus" size={15} color="white" /> เพิ่มบัญชี
+        </button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        {accounts.map(acc => {
+          const change = acc.balance - acc.initial;
+          return (
+            <div key={acc.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-hover">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl flex items-center justify-center" style={{background: acc.color+'22'}}>
+                    <LIcon name={acc.icon} size={22} color={acc.color} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800 text-sm">{acc.name}</p>
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{background: acc.color+'18', color: acc.color}}>{typeLabels[acc.type]}</span>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => openEdit(acc)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><LIcon name="Edit" size={14} /></button>
+                  <button onClick={() => del(acc.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-400"><LIcon name="Trash2" size={14} /></button>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>ยอดเริ่มต้น</span>
+                  <span>฿{fmt(acc.initial)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500">ยอดปัจจุบัน</span>
+                  <span className="text-lg font-bold" style={{color: acc.balance < 0 ? '#ef4444' : '#1e293b'}}>
+                    {acc.balance < 0 ? '-' : ''}฿{fmt(acc.balance)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-400">เปลี่ยนแปลง</span>
+                  <span className={change >= 0 ? 'text-emerald-500 font-medium' : 'text-red-400 font-medium'}>
+                    {change >= 0 ? '+' : '-'}฿{fmt(change)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {showModal && (
+        <Modal title={editing ? 'แก้ไขบัญชี' : 'เพิ่มบัญชีใหม่'} onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อบัญชี</label>
+              <input value={form.name} onChange={e => setForm({...form, name:e.target.value})} placeholder="เช่น บัญชีออมทรัพย์ KBank" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm text-slate-700 bg-slate-50" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ประเภท</label>
+                <select value={form.type} onChange={e => setForm({...form, type:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                  <option value="cash">เงินสด</option>
+                  <option value="bank">ธนาคาร</option>
+                  <option value="credit">เครดิต</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ไอคอน</label>
+                <select value={form.icon} onChange={e => setForm({...form, icon:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                  {iconOptions.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ยอดเริ่มต้น (฿)</label>
+                <input type="number" value={form.initial} onChange={e => setForm({...form, initial:e.target.value})} placeholder="0" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ยอดปัจจุบัน (฿)</label>
+                <input type="number" value={form.balance} onChange={e => setForm({...form, balance:e.target.value})} placeholder="0" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">สี</label>
+              <div className="flex gap-2 flex-wrap">
+                {colorOptions.map(c => (
+                  <button key={c} onClick={() => setForm({...form, color:c})} className="w-7 h-7 rounded-full border-2 transition-all" style={{background:c, borderColor: form.color===c ? '#1e293b' : 'transparent'}} />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">ยกเลิก</button>
+              <button onClick={save} className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium">บันทึก</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── TRANSACTIONS VIEW ────────────────────────────────────
+function TransactionsView({ transactions, setTransactions, accounts }) {
+  const [showModal, setShowModal] = useState(false);
+  const [txType, setTxType] = useState('expense');
+  const [filterMonth, setFilterMonth] = useState('2026-04');
+  const [filterType, setFilterType] = useState('all');
+  const [filterAcc, setFilterAcc] = useState('all');
+  const [form, setForm] = useState({ amount:'', note:'', category:'food', account: accounts[0]?.id, fromAccount: accounts[0]?.id, toAccount: accounts[1]?.id, date: '2026-04-19' });
+
+  const allCats = [...CATEGORIES.expense, ...CATEGORIES.income];
+  const filtered = transactions.filter(t => {
+    const monthMatch = t.date?.startsWith(filterMonth);
+    const typeMatch = filterType === 'all' || t.type === filterType;
+    const accMatch = filterAcc === 'all' || String(t.account) === filterAcc || String(t.fromAccount) === filterAcc || String(t.toAccount) === filterAcc;
+    return monthMatch && typeMatch && accMatch;
+  });
+
+  const totalIncome = filtered.filter(t => t.type==='income').reduce((s,t) => s+t.amount, 0);
+  const totalExpense = filtered.filter(t => t.type==='expense').reduce((s,t) => s+t.amount, 0);
+
+  const save = () => {
+    if (!form.amount) return;
+    const newTx = { ...form, id: Date.now(), type: txType, amount: parseFloat(form.amount) };
+    setTransactions(t => [newTx, ...t]);
+    setShowModal(false);
+  };
+
+  const typeLabel = { income:'รายรับ', expense:'รายจ่าย', transfer:'โอนเงิน' };
+  const typeColor = { income:'#10b981', expense:'#ef4444', transfer:'#6366f1' };
+  const typeBg = { income:'#f0fdf4', expense:'#fff1f2', transfer:'#eef2ff' };
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* Summary */}
+      <div className="grid grid-cols-3 gap-4">
+        {[
+          { label:'รายรับ', value:totalIncome, color:'#10b981', bg:'#f0fdf4' },
+          { label:'รายจ่าย', value:totalExpense, color:'#ef4444', bg:'#fff1f2' },
+          { label:'คงเหลือ', value:totalIncome-totalExpense, color:'#6366f1', bg:'#eef2ff' },
+        ].map((s,i) => (
+          <div key={i} className="rounded-2xl p-4" style={{background:s.bg}}>
+            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
+            <p className="text-xl font-bold" style={{color:s.color}}>฿{fmt(s.value)}</p>
+          </div>
+        ))}
+      </div>
+      {/* Quick add */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-slate-700">ประวัติรายการ</h2>
+        <div className="flex gap-2">
+          {['income','expense','transfer'].map(t => (
+            <button key={t} onClick={() => { setTxType(t); setShowModal(true); }}
+              className="text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 border"
+              style={{color: typeColor[t], background: typeBg[t], borderColor: typeColor[t]+'33'}}>
+              <LIcon name={t==='income'?'ArrowUp':t==='expense'?'ArrowDown':'ArrowLeftRight'} size={13} color={typeColor[t]} />
+              {typeLabel[t]}
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Filters */}
+      <div className="flex gap-3 flex-wrap">
+        <input type="month" value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-700" />
+        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-700">
+          <option value="all">ทุกประเภท</option>
+          <option value="income">รายรับ</option>
+          <option value="expense">รายจ่าย</option>
+          <option value="transfer">โอนเงิน</option>
+        </select>
+        <select value={filterAcc} onChange={e => setFilterAcc(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white text-slate-700">
+          <option value="all">ทุกบัญชี</option>
+          {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </div>
+      {/* Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-slate-100 bg-slate-50">
+              {['วันที่','ประเภท','หมวดหมู่','บัญชี','หมายเหตุ','จำนวน'].map(h => (
+                <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map(tx => {
+              const cat = getCat(tx.category);
+              const acc = accounts.find(a => a.id === (tx.account || tx.fromAccount));
+              const toAcc = accounts.find(a => a.id === tx.toAccount);
+              return (
+                <tr key={tx.id} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-slate-500 text-xs">{tx.date}</td>
+                  <td className="px-4 py-3">
+                    <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{color: typeColor[tx.type], background: typeBg[tx.type]}}>
+                      {typeLabel[tx.type]}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    {tx.type !== 'transfer' && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{background:cat.color+'22'}}>
+                          <LIcon name={cat.icon} size={12} color={cat.color} />
+                        </div>
+                        <span className="text-slate-700 text-xs">{cat.name}</span>
+                      </div>
+                    )}
+                    {tx.type === 'transfer' && <span className="text-slate-400 text-xs">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-600">
+                    {tx.type === 'transfer' ? `${acc?.name} → ${toAcc?.name}` : acc?.name}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-slate-500">{tx.note}</td>
+                  <td className="px-4 py-3 text-right font-semibold" style={{color: tx.type==='income'?'#10b981': tx.type==='expense'?'#ef4444':'#6366f1'}}>
+                    {tx.type==='expense'?'-':'+'}{tx.type==='transfer'?'':''}฿{fmt(tx.amount)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        {filtered.length === 0 && (
+          <div className="py-12 text-center text-slate-400 text-sm">ไม่พบรายการ</div>
+        )}
+      </div>
+      {showModal && (
+        <Modal title={`เพิ่ม${typeLabel[txType]}`} onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">วันที่</label>
+              <input type="date" value={form.date} onChange={e => setForm({...form, date:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">จำนวนเงิน (฿)</label>
+              <input type="number" value={form.amount} onChange={e => setForm({...form, amount:e.target.value})} placeholder="0.00" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700 text-lg font-bold" />
+            </div>
+            {txType !== 'transfer' && (
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">หมวดหมู่</label>
+                <select value={form.category} onChange={e => setForm({...form, category:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                  {CATEGORIES[txType].map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            )}
+            {txType !== 'transfer' ? (
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">บัญชี</label>
+                <select value={form.account} onChange={e => setForm({...form, account:parseInt(e.target.value)})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">จากบัญชี</label>
+                  <select value={form.fromAccount} onChange={e => setForm({...form, fromAccount:parseInt(e.target.value)})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">ไปยังบัญชี</label>
+                  <select value={form.toAccount} onChange={e => setForm({...form, toAccount:parseInt(e.target.value)})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">หมายเหตุ</label>
+              <input value={form.note} onChange={e => setForm({...form, note:e.target.value})} placeholder="บันทึกข้อมูลเพิ่มเติม..." className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">ยกเลิก</button>
+              <button onClick={save} className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium">บันทึก</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── BUDGETS VIEW ─────────────────────────────────────────
+function BudgetsView() {
+  const [budgets, setBudgets] = useState(BUDGETS);
+  const totalLimit = budgets.reduce((s,b) => s+b.limit, 0);
+  const totalSpent = budgets.reduce((s,b) => s+b.spent, 0);
+  const daysInMonth = 30, daysLeft = 11;
+  const dailyBudget = (totalLimit - totalSpent) / daysLeft;
+
+  const getPct = (b) => Math.min((b.spent / b.limit) * 100, 100);
+  const getColor = (pct) => pct <= 50 ? '#10b981' : pct <= 80 ? '#f59e0b' : '#ef4444';
+  const getBg = (pct) => pct <= 50 ? '#f0fdf4' : pct <= 80 ? '#fefce8' : '#fff1f2';
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* Overview */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="flex justify-between items-start mb-3">
+            <div>
+              <p className="text-xs text-slate-500">งบประมาณรายเดือน</p>
+              <p className="text-2xl font-bold text-slate-800 mt-0.5">฿{fmt(totalLimit)}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-slate-500">ใช้ไปแล้ว</p>
+              <p className="text-xl font-bold text-slate-700 mt-0.5">฿{fmt(totalSpent)}</p>
+            </div>
+          </div>
+          <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+            <div className="h-full rounded-full progress-bar" style={{width:`${Math.min((totalSpent/totalLimit)*100,100)}%`, background: getColor(Math.min((totalSpent/totalLimit)*100,100))}} />
+          </div>
+          <div className="flex justify-between text-xs text-slate-400 mt-1.5">
+            <span>ใช้ไป {((totalSpent/totalLimit)*100).toFixed(1)}%</span>
+            <span>คงเหลือ ฿{fmt(totalLimit-totalSpent)}</span>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-5 text-white flex flex-col justify-between">
+          <p className="text-indigo-100 text-xs font-medium">งบรายวันที่เหลือ</p>
+          <div>
+            <p className="text-3xl font-bold mt-1">฿{Math.round(dailyBudget).toLocaleString()}</p>
+            <p className="text-indigo-200 text-xs mt-1">เหลืออีก {daysLeft} วัน</p>
+          </div>
+        </div>
+      </div>
+      {/* Category budgets */}
+      <h2 className="text-base font-semibold text-slate-700">งบแยกตามหมวดหมู่</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {budgets.map(b => {
+          const cat = getCat(b.category);
+          const pct = getPct(b);
+          const color = getColor(pct);
+          const bg = getBg(pct);
+          return (
+            <div key={b.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-hover">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{background: cat.color+'22'}}>
+                    <LIcon name={cat.icon} size={18} color={cat.color} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-sm text-slate-700">{cat.name}</p>
+                    <p className="text-xs text-slate-400">฿{fmt(b.spent)} / ฿{fmt(b.limit)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{color, background:bg}}>{pct.toFixed(0)}%</span>
+                  {b.spent > b.limit && <p className="text-xs text-red-400 mt-0.5">เกินงบ!</p>}
+                </div>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                <div className="h-full rounded-full progress-bar" style={{width:`${pct}%`, background:color}} />
+              </div>
+              <div className="flex justify-between text-xs text-slate-400 mt-1.5">
+                <span>คงเหลือ</span>
+                <span className={b.spent > b.limit ? 'text-red-400 font-medium' : 'text-slate-600'}>
+                  {b.spent > b.limit ? `-฿${fmt(b.spent-b.limit)}` : `฿${fmt(b.limit-b.spent)}`}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── GOALS VIEW ───────────────────────────────────────────
+function GoalsView({ accounts }) {
+  const [goals, setGoals] = useState(GOALS);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name:'', target:'', saved:'', deadline:'', account: accounts[0]?.id, icon:'Target', color:'#6366f1' });
+
+  const iconOpts = ['Smartphone','Plane','Shield','Monitor','Home','Car','Gift','Briefcase','Target'];
+  const colorOpts = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6'];
+
+  const save = () => {
+    if (!form.name||!form.target) return;
+    setGoals(g => [...g, { ...form, id:Date.now(), target:parseFloat(form.target), saved:parseFloat(form.saved||0), account:parseInt(form.account) }]);
+    setShowModal(false);
+  };
+
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold text-slate-700">เป้าหมายการออม</h2>
+        <button onClick={() => setShowModal(true)} className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
+          <LIcon name="Plus" size={15} color="white" /> เพิ่มเป้าหมาย
+        </button>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {goals.map(g => {
+          const pct = Math.min((g.saved / g.target) * 100, 100);
+          const monthsLeft = getMonthsLeft(g.deadline);
+          const monthlyNeeded = Math.ceil((g.target - g.saved) / monthsLeft);
+          const acc = accounts.find(a => a.id === g.account);
+          return (
+            <div key={g.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 card-hover">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{background: g.color+'18'}}>
+                    <LIcon name={g.icon} size={24} color={g.color} />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-slate-800">{g.name}</p>
+                    <p className="text-xs text-slate-400">เป้าหมาย ฿{fmt(g.target)}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold" style={{color:g.color}}>{pct.toFixed(0)}%</p>
+                  <p className="text-xs text-slate-400">{g.deadline}</p>
+                </div>
+              </div>
+              <div className="w-full bg-slate-100 rounded-full h-2.5 mb-2 overflow-hidden">
+                <div className="h-full rounded-full progress-bar" style={{width:`${pct}%`, background:g.color}} />
+              </div>
+              <div className="flex justify-between text-xs text-slate-500 mb-3">
+                <span>ออมแล้ว ฿{fmt(g.saved)}</span>
+                <span>คงเหลือ ฿{fmt(g.target - g.saved)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="bg-indigo-50 rounded-xl px-3 py-2 text-xs">
+                  <p className="text-slate-500">ต้องออมต่อเดือน</p>
+                  <p className="font-bold text-indigo-600 mt-0.5">฿{fmt(monthlyNeeded)}/เดือน</p>
+                </div>
+                {acc && (
+                  <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
+                    <div className="w-4 h-4 rounded flex items-center justify-center" style={{background:acc.color+'22'}}>
+                      <LIcon name={acc.icon} size={11} color={acc.color} />
+                    </div>
+                    {acc.name}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {showModal && (
+        <Modal title="เพิ่มเป้าหมายใหม่" onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อเป้าหมาย</label>
+              <input value={form.name} onChange={e => setForm({...form, name:e.target.value})} placeholder="เช่น ซื้อรถ, ท่องเที่ยว" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">เป้าหมาย (฿)</label>
+                <input type="number" value={form.target} onChange={e => setForm({...form, target:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ออมแล้ว (฿)</label>
+                <input type="number" value={form.saved} onChange={e => setForm({...form, saved:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">วันที่เป้าหมาย</label>
+              <input type="date" value={form.deadline} onChange={e => setForm({...form, deadline:e.target.value})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">บัญชีที่เก็บ</label>
+              <select value={form.account} onChange={e => setForm({...form, account:parseInt(e.target.value)})} className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ไอคอน</label>
+              <div className="flex gap-2 flex-wrap">
+                {iconOpts.map(ico => (
+                  <button key={ico} onClick={() => setForm({...form, icon:ico})} className="w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all" style={{background: form.icon===ico ? form.color+'22' : '#f8fafc', borderColor: form.icon===ico ? form.color : '#e2e8f0'}}>
+                    <LIcon name={ico} size={16} color={form.icon===ico ? form.color : '#94a3b8'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">สี</label>
+              <div className="flex gap-2">
+                {colorOpts.map(c => (
+                  <button key={c} onClick={() => setForm({...form, color:c})} className="w-7 h-7 rounded-full border-2 transition-all" style={{background:c, borderColor: form.color===c ? '#1e293b' : 'transparent'}} />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium">ยกเลิก</button>
+              <button onClick={save} className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium">บันทึก</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── ANALYTICS VIEW ───────────────────────────────────────
+function AnalyticsView({ accounts, transactions }) {
+  const totalAssets = accounts.filter(a=>a.balance>0).reduce((s,a)=>s+a.balance,0);
+  const totalLiab = Math.abs(accounts.filter(a=>a.balance<0).reduce((s,a)=>s+a.balance,0));
+  const netWorth = totalAssets - totalLiab;
+
+  const thisMonth = transactions.filter(t => t.date?.startsWith('2026-04'));
+  const income = thisMonth.filter(t=>t.type==='income').reduce((s,t)=>s+t.amount,0);
+  const expense = thisMonth.filter(t=>t.type==='expense').reduce((s,t)=>s+t.amount,0);
+
+  // Donut data
+  const expBycat = {};
+  thisMonth.filter(t=>t.type==='expense').forEach(t => {
+    expBycat[t.category] = (expBycat[t.category]||0) + t.amount;
+  });
+  const donutData = Object.entries(expBycat).map(([id, value]) => {
+    const cat = getCat(id);
+    return { label:cat.name, value, color:cat.color };
+  }).sort((a,b)=>b.value-a.value);
+
+  // Top 5 expenses
+  const top5 = [...thisMonth.filter(t=>t.type==='expense')].sort((a,b)=>b.amount-a.amount).slice(0,5);
+
+  // Bar chart data (last 6 months)
+  const barData = [
+    { month:'พ.ย.', income:38000, expense:22000 },
+    { month:'ธ.ค.', income:41000, expense:35000 },
+    { month:'ม.ค.', income:38500, expense:28000 },
+    { month:'ก.พ.', income:39000, expense:31000 },
+    { month:'มี.ค.', income:43000, expense:26000 },
+    { month:'เม.ย.', income, expense },
+  ];
+
+  const lastMonthExpense = 26000;
+  const momChange = ((expense - lastMonthExpense) / lastMonthExpense * 100).toFixed(1);
+
+  return (
+    <div className="p-6 space-y-5">
+      {/* Net Worth */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label:'มูลค่าสุทธิ', value:netWorth, color:'#6366f1', bg:'#eef2ff', large:true },
+          { label:'สินทรัพย์รวม', value:totalAssets, color:'#10b981', bg:'#f0fdf4' },
+          { label:'หนี้สินรวม', value:totalLiab, color:'#ef4444', bg:'#fff1f2' },
+          { label:'รายได้เดือนนี้', value:income, color:'#10b981', bg:'#f0fdf4' },
+        ].map((s,i) => (
+          <div key={i} className="rounded-2xl p-4 card-hover" style={{background:s.bg}}>
+            <p className="text-xs text-slate-500 mb-1">{s.label}</p>
+            <p className={`font-bold ${s.large?'text-2xl':'text-xl'}`} style={{color:s.color}}>฿{fmt(s.value)}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-5 gap-4">
+        {/* Donut + legend */}
+        <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-slate-700">รายจ่ายตามหมวด</h3>
+          </div>
+          <div className="flex items-start gap-4">
+            <DonutChart data={donutData} size={160} />
+            <div className="flex-1 space-y-2 mt-2">
+              {donutData.slice(0,5).map((d,i) => (
+                <div key={i} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{background:d.color}} />
+                    <span className="text-xs text-slate-600">{d.label}</span>
+                  </div>
+                  <span className="text-xs font-medium text-slate-700">฿{fmt(d.value)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bar chart */}
+        <div className="col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-700">รายรับ vs รายจ่าย</h3>
+            <div className="flex gap-3 text-xs">
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-emerald-400" /><span className="text-slate-500">รายรับ</span></div>
+              <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full bg-rose-400" /><span className="text-slate-500">รายจ่าย</span></div>
+            </div>
+          </div>
+          <BarChart data={barData} />
+          <div className="mt-3 flex items-center gap-2 bg-slate-50 rounded-xl px-3 py-2.5">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${parseFloat(momChange)<0?'bg-emerald-50':'bg-red-50'}`}>
+              <LIcon name={parseFloat(momChange)<0?'TrendingDown':'TrendingUp'} size={14} color={parseFloat(momChange)<0?'#10b981':'#ef4444'} />
+            </div>
+            <p className="text-xs text-slate-600">
+              รายจ่ายเดือนนี้ <span className={`font-bold ${parseFloat(momChange)<0?'text-emerald-500':'text-red-500'}`}>{parseFloat(momChange)<0?'ลดลง':'เพิ่มขึ้น'} {Math.abs(momChange)}%</span> จากเดือนก่อน
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Top 5 */}
+      <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+        <h3 className="text-sm font-semibold text-slate-700 mb-4">Top 5 รายจ่ายสูงสุด</h3>
+        <div className="space-y-3">
+          {top5.map((tx, i) => {
+            const cat = getCat(tx.category);
+            const pct = (tx.amount / top5[0].amount) * 100;
+            return (
+              <div key={tx.id} className="flex items-center gap-3">
+                <div className="w-6 text-center text-xs font-bold text-slate-400">#{i+1}</div>
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{background:cat.color+'22'}}>
+                  <LIcon name={cat.icon} size={16} color={cat.color} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-center mb-1">
+                    <p className="text-xs font-medium text-slate-700">{tx.note}</p>
+                    <p className="text-xs font-bold text-slate-800 ml-2">฿{fmt(tx.amount)}</p>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div className="h-full rounded-full" style={{width:`${pct}%`, background:cat.color}} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CATEGORIES VIEW ──────────────────────────────────────
+function CategoriesView() {
+  const [tab, setTab] = useState('expense');
+  const [cats, setCats] = useState({ expense:[...CATEGORIES.expense], income:[...CATEGORIES.income] });
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ name:'', icon:'Tag', color:'#6366f1' });
+  const iconOpts = ['UtensilsCrossed','Car','ShoppingBag','Tv','Heart','Zap','GraduationCap','Home','Briefcase','Laptop','Gift','Smartphone','Plane','Shield','Monitor','Tag','Star','DollarSign'];
+  const colorOpts = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#06b6d4','#f97316','#84cc16'];
+  const save = () => {
+    if (!form.name) return;
+    setCats(c => ({ ...c, [tab]: [...c[tab], { ...form, id:`custom_${Date.now()}` }] }));
+    setShowModal(false);
+  };
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+          {['expense','income'].map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${tab===t?'bg-white shadow text-slate-800':'text-slate-500 hover:text-slate-700'}`}>
+              {t==='expense'?'รายจ่าย':'รายรับ'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowModal(true)} className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
+          <LIcon name="Plus" size={15} color="white" /> เพิ่มหมวดหมู่
+        </button>
+      </div>
+      <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+        {cats[tab].map(c => (
+          <div key={c.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-hover flex flex-col items-center gap-2.5 cursor-pointer hover:border-indigo-200">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{background: c.color+'18'}}>
+              <LIcon name={c.icon} size={24} color={c.color} />
+            </div>
+            <p className="text-xs font-medium text-slate-700 text-center leading-snug">{c.name}</p>
+            <div className="w-3 h-3 rounded-full" style={{background:c.color}} />
+          </div>
+        ))}
+        <div onClick={() => setShowModal(true)} className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2.5 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100">
+            <LIcon name="Plus" size={22} color="#94a3b8" />
+          </div>
+          <p className="text-xs text-slate-400">เพิ่มใหม่</p>
+        </div>
+      </div>
+      {showModal && (
+        <Modal title="เพิ่มหมวดหมู่ใหม่" onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อหมวดหมู่</label>
+              <input value={form.name} onChange={e => setForm({...form, name:e.target.value})} placeholder="เช่น สัตว์เลี้ยง, เกม" className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">ไอคอน</label>
+              <div className="flex gap-2 flex-wrap">
+                {iconOpts.map(ico => (
+                  <button key={ico} onClick={() => setForm({...form, icon:ico})} className="w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all" style={{background: form.icon===ico ? form.color+'22' : '#f8fafc', borderColor: form.icon===ico ? form.color : '#e2e8f0'}}>
+                    <LIcon name={ico} size={16} color={form.icon===ico ? form.color : '#94a3b8'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">สี</label>
+              <div className="flex gap-2 flex-wrap">
+                {colorOpts.map(c => (
+                  <button key={c} onClick={() => setForm({...form, color:c})} className="w-7 h-7 rounded-full border-2 transition-all" style={{background:c, borderColor: form.color===c ? '#1e293b' : 'transparent'}} />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium">ยกเลิก</button>
+              <button onClick={save} className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium">บันทึก</button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ─── SIDEBAR ──────────────────────────────────────────────
+const NAV = [
+  { id:'analytics', label:'แดชบอร์ด', icon:'LayoutDashboard' },
+  { id:'accounts', label:'บัญชี/กระเป๋าเงิน', icon:'Wallet' },
+  { id:'transactions', label:'รายการ', icon:'ArrowLeftRight' },
+  { id:'budgets', label:'งบประมาณ', icon:'Target' },
+  { id:'goals', label:'เป้าหมายออม', icon:'TrendingUp' },
+  { id:'categories', label:'หมวดหมู่', icon:'Tag' },
+];
+
+// ─── MAIN APP ─────────────────────────────────────────────
+function App() {
+  const [view, setView] = useState(() => localStorage.getItem('paomoney_view') || 'analytics');
+  const [accounts, setAccounts] = useState(INITIAL_ACCOUNTS);
+  const [transactions, setTransactions] = useState(INITIAL_TRANSACTIONS);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [tweaksOpen, setTweaksOpen] = useState(false);
+
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "accentColor": "#3b82f6",
+    "darkMode": false,
+    "compactMode": false,
+    "userName": "ปาว"
+  }/*EDITMODE-END*/;
+  const [tweaks, setTweaks] = useState(TWEAK_DEFAULTS);
+
+  useEffect(() => { localStorage.setItem('paomoney_view', view); }, [view]);
+
+  // Tweaks panel protocol
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === '__activate_edit_mode') setTweaksOpen(true);
+      if (e.data?.type === '__deactivate_edit_mode') setTweaksOpen(false);
+    };
+    window.addEventListener('message', handler);
+    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const updateTweak = (key, val) => {
+    const next = { ...tweaks, [key]: val };
+    setTweaks(next);
+    window.parent.postMessage({ type: '__edit_mode_set_keys', edits: next }, '*');
+  };
+
+  const accent = tweaks.accentColor;
+  const isDark = tweaks.darkMode;
+
+  const totalAssets = accounts.filter(a=>a.balance>0).reduce((s,a)=>s+a.balance,0);
+  const totalLiab = accounts.filter(a=>a.balance<0).reduce((s,a)=>s+a.balance,0);
+
+  const pageTitle = NAV.find(n => n.id === view)?.label || '';
+
+  return (
+    <div className={`flex h-screen overflow-hidden ${isDark ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-800'}`}>
+      {/* Sidebar */}
+      <aside className={`flex flex-col ${sidebarCollapsed ? 'w-16' : 'w-60'} flex-shrink-0 transition-all duration-200 border-r ${isDark?'bg-slate-900 border-slate-800':'bg-white border-slate-100'} shadow-sm`}>
+        {/* Logo */}
+        <div className="px-4 py-5 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{background: accent}}>
+            <LIcon name="Wallet" size={18} color="white" />
+          </div>
+          {!sidebarCollapsed && <span className="text-base font-bold" style={{color:accent}}>PaoMoney</span>}
+        </div>
+        {/* User */}
+        {!sidebarCollapsed && (
+          <div className={`mx-3 mb-3 p-3 rounded-xl ${isDark?'bg-slate-800':'bg-slate-50'}`}>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{background: accent}}>
+                {tweaks.userName?.[0] || 'P'}
+              </div>
+              <div>
+                <p className="text-xs font-semibold">{tweaks.userName}</p>
+                <p className="text-xs text-slate-400">฿{fmt(totalAssets+totalLiab)} สุทธิ</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Nav */}
+        <nav className="flex-1 px-2 space-y-0.5 overflow-y-auto">
+          {NAV.map(item => (
+            <button key={item.id} onClick={() => setView(item.id)}
+              className={`sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all ${view===item.id ? 'active font-semibold' : isDark?'text-slate-400 hover:text-slate-200':'text-slate-500 hover:text-slate-800'}`}
+              style={view===item.id ? {color:accent} : {}}>
+              <LIcon name={item.icon} size={18} color={view===item.id ? accent : undefined} />
+              {!sidebarCollapsed && <span>{item.label}</span>}
+            </button>
+          ))}
+        </nav>
+        {/* Bottom */}
+        <div className="px-2 pb-4 space-y-0.5">
+          <button className={`sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${isDark?'text-slate-400':'text-slate-400'}`}>
+            <LIcon name="Settings" size={17} />
+            {!sidebarCollapsed && <span>ตั้งค่า</span>}
+          </button>
+          <button onClick={() => setSidebarCollapsed(c => !c)} className={`sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm ${isDark?'text-slate-400':'text-slate-400'}`}>
+            <LIcon name="Menu" size={17} />
+            {!sidebarCollapsed && <span>ย่อแถบเมนู</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Topbar */}
+        <header className={`flex-shrink-0 border-b px-6 py-4 flex items-center justify-between ${isDark?'bg-slate-900 border-slate-800':'bg-white border-slate-100'} shadow-sm`}>
+          <div>
+            <h1 className="text-lg font-bold text-slate-800">{pageTitle}</h1>
+            <p className="text-xs text-slate-400 mt-0.5">19 เมษายน 2569</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className={`flex items-center gap-2 border rounded-xl px-3 py-2 text-sm ${isDark?'border-slate-700 bg-slate-800':'border-slate-200 bg-slate-50'}`}>
+              <LIcon name="Search" size={15} color="#94a3b8" />
+              <input placeholder="ค้นหา..." className="bg-transparent text-sm w-32 text-slate-600 placeholder-slate-400" />
+            </div>
+            <button className="relative p-2.5 rounded-xl hover:bg-slate-100 text-slate-500">
+              <LIcon name="Bell" size={18} />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full" style={{background:accent}} />
+            </button>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{background: accent}}>
+              {tweaks.userName?.[0] || 'P'}
+            </div>
+          </div>
+        </header>
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
+          {view === 'accounts' && <AccountsView accounts={accounts} setAccounts={setAccounts} />}
+          {view === 'transactions' && <TransactionsView transactions={transactions} setTransactions={setTransactions} accounts={accounts} />}
+          {view === 'budgets' && <BudgetsView />}
+          {view === 'goals' && <GoalsView accounts={accounts} />}
+          {view === 'analytics' && <AnalyticsView accounts={accounts} transactions={transactions} />}
+          {view === 'categories' && <CategoriesView />}
+        </main>
+      </div>
+
+      {/* Tweaks Panel */}
+      {tweaksOpen && (
+        <div className="fixed bottom-4 right-4 z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 w-72 modal-box">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-700">Tweaks</p>
+            <button onClick={() => setTweaksOpen(false)} className="text-slate-400 hover:text-slate-600"><LIcon name="X" size={16} /></button>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">สีหลัก</label>
+              <div className="flex gap-2 flex-wrap">
+                {['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899'].map(c => (
+                  <button key={c} onClick={() => updateTweak('accentColor', c)} className="w-7 h-7 rounded-full border-2 transition-all" style={{background:c, borderColor: tweaks.accentColor===c?'#1e293b':'transparent'}} />
+                ))}
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-slate-500">โหมดกลางคืน</label>
+              <button onClick={() => updateTweak('darkMode', !tweaks.darkMode)} className={`w-10 h-5 rounded-full transition-all ${tweaks.darkMode?'':'bg-slate-200'}`} style={tweaks.darkMode?{background:accent}:{}}>
+                <div className={`w-4 h-4 rounded-full bg-white shadow transition-all mx-0.5 ${tweaks.darkMode?'translate-x-5':''}`} style={{transform: tweaks.darkMode?'translateX(20px)':'none'}} />
+              </button>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อผู้ใช้</label>
+              <input value={tweaks.userName} onChange={e => updateTweak('userName', e.target.value)} className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 text-slate-700" />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>

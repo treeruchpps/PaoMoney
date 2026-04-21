@@ -1,0 +1,35 @@
+* { font-family: 'Sarabun', sans-serif; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+.sidebar-item { transition: all 0.18s ease; }
+.sidebar-item:hover { background: rgba(99, 102, 241, 0.10); }
+.sidebar-item.active {
+  background: linear-gradient(90deg, rgba(99,102,241,0.18) 0%, rgba(99,102,241,0.04) 100%);
+  border-left: 3px solid #6366f1;
+}
+
+.card-hover { transition: transform 0.18s ease, box-shadow 0.18s ease; }
+.card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.09); }
+
+.progress-bar { transition: width 0.6s ease; }
+
+.modal-bg { animation: fadeIn 0.15s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal-box { animation: slideUp 0.2s ease; }
+@keyframes slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #6366f1 0%, #818cf8 100%);
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+
+input, select { outline: none; }
+input:focus, select:focus { box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.35); }

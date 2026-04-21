@@ -23,10 +23,11 @@ func (h *ProfileHandler) GetProfile(c *gin.Context) {
 
 	var profile models.UserProfile
 	err := h.db.QueryRow(context.Background(),
-		`SELECT id, user_id, display_name, avatar_url, created_at, updated_at
+		`SELECT id, user_id, display_name, avatar_url, week_start_day, created_at, updated_at
 		 FROM user_profiles WHERE user_id = $1`,
 		userID,
-	).Scan(&profile.ID, &profile.UserID, &profile.DisplayName, &profile.AvatarURL, &profile.CreatedAt, &profile.UpdatedAt)
+	).Scan(&profile.ID, &profile.UserID, &profile.DisplayName, &profile.AvatarURL,
+		&profile.WeekStartDay, &profile.CreatedAt, &profile.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "profile not found"})
@@ -49,12 +50,14 @@ func (h *ProfileHandler) UpdateProfile(c *gin.Context) {
 	var profile models.UserProfile
 	err := h.db.QueryRow(context.Background(),
 		`UPDATE user_profiles
-		 SET display_name = COALESCE($1, display_name),
-		     avatar_url   = COALESCE($2, avatar_url)
-		 WHERE user_id = $3
-		 RETURNING id, user_id, display_name, avatar_url, created_at, updated_at`,
-		req.DisplayName, req.AvatarURL, userID,
-	).Scan(&profile.ID, &profile.UserID, &profile.DisplayName, &profile.AvatarURL, &profile.CreatedAt, &profile.UpdatedAt)
+		 SET display_name   = COALESCE($1, display_name),
+		     avatar_url     = COALESCE($2, avatar_url),
+		     week_start_day = COALESCE($3, week_start_day)
+		 WHERE user_id = $4
+		 RETURNING id, user_id, display_name, avatar_url, week_start_day, created_at, updated_at`,
+		req.DisplayName, req.AvatarURL, req.WeekStartDay, userID,
+	).Scan(&profile.ID, &profile.UserID, &profile.DisplayName, &profile.AvatarURL,
+		&profile.WeekStartDay, &profile.CreatedAt, &profile.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update profile"})

@@ -48,6 +48,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// อัปเดต week_start_day ใน profile ที่ถูกสร้างอัตโนมัติโดย trigger
+	weekStart := req.WeekStartDay
+	if weekStart < 0 || weekStart > 6 {
+		weekStart = 1 // default: Monday
+	}
+	h.db.Exec(context.Background(),
+		`UPDATE user_profiles SET week_start_day = $1 WHERE user_id = $2`,
+		weekStart, user.ID,
+	)
+
 	access, _ := middleware.GenerateAccessToken(user.ID, user.Email, &h.cfg.JWT)
 	refresh, _ := middleware.GenerateRefreshToken(user.ID, user.Email, &h.cfg.JWT)
 

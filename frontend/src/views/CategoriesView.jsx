@@ -1,0 +1,146 @@
+import { useState, useEffect } from 'react';
+import Icon from '../components/common/Icon';
+import Modal from '../components/common/Modal';
+import { categories as categoriesApi } from '../services/api';
+
+const ICON_OPTS  = ['UtensilsCrossed','Car','ShoppingBag','Tv','Heart','Zap','GraduationCap','Home','Briefcase','Laptop','Gift','Smartphone','Plane','Shield','Monitor','Tag','Star','DollarSign'];
+const COLOR_OPTS = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#06b6d4','#f97316','#84cc16'];
+
+export default function CategoriesView({ onRefresh }) {
+  const [tab, setTab]           = useState('expense');
+  const [catList, setCatList]   = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm]         = useState({ name: '', icon: 'Tag', color: '#6366f1' });
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState('');
+
+  const fetchCats = async () => {
+    setLoading(true);
+    try { setCatList((await categoriesApi.list()) || []); }
+    catch { setCatList([]); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchCats(); }, []);
+
+  const displayed = catList.filter((c) => c.type === tab);
+
+  const save = async () => {
+    if (!form.name.trim()) { setError('กรุณาใส่ชื่อหมวดหมู่'); return; }
+    setSaving(true); setError('');
+    try {
+      await categoriesApi.create({ name: form.name, type: tab, icon: form.icon });
+      await fetchCats();
+      if (onRefresh) onRefresh();
+      setShowModal(false);
+      setForm({ name: '', icon: 'Tag', color: '#6366f1' });
+    } catch (err) { setError(err.message); }
+    finally { setSaving(false); }
+  };
+
+  const remove = async (id) => {
+    if (!window.confirm('ต้องการลบหมวดหมู่นี้?')) return;
+    try { await categoriesApi.delete(id); await fetchCats(); if (onRefresh) onRefresh(); }
+    catch (err) { alert(err.message); }
+  };
+
+  return (
+    <div className="p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex bg-slate-100 rounded-xl p-1 gap-1">
+          {['expense', 'income'].map((t) => (
+            <button key={t} onClick={() => setTab(t)}
+              className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${tab === t ? 'bg-white shadow text-slate-800' : 'text-slate-500 hover:text-slate-700'}`}>
+              {t === 'expense' ? 'รายจ่าย' : 'รายรับ'}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => { setError(''); setShowModal(true); }}
+          className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
+          <Icon name="Plus" size={15} color="white" /> เพิ่มหมวดหมู่
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="py-16 text-center text-slate-400 text-sm">กำลังโหลด...</div>
+      ) : (
+        <div className="grid grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          {displayed.map((c) => (
+            <div key={c.id}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-hover flex flex-col items-center gap-2.5 cursor-pointer hover:border-indigo-200 relative group">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: '#6366f118' }}>
+                <Icon name={c.icon || 'Tag'} size={24} color="#6366f1" />
+              </div>
+              <p className="text-xs font-medium text-slate-700 text-center leading-snug">{c.name}</p>
+              {/* Delete on hover (only user-created categories have user_id) */}
+              {c.user_id && (
+                <button onClick={() => remove(c.id)}
+                  className="absolute top-2 right-2 w-5 h-5 rounded-full bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <Icon name="ArrowDown" size={9} color="#ef4444" />
+                </button>
+              )}
+            </div>
+          ))}
+
+          <div onClick={() => { setError(''); setShowModal(true); }}
+            className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2.5 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100">
+              <Icon name="Plus" size={22} color="#94a3b8" />
+            </div>
+            <p className="text-xs text-slate-400">เพิ่มใหม่</p>
+          </div>
+        </div>
+      )}
+
+      {showModal && (
+        <Modal title="เพิ่มหมวดหมู่ใหม่" onClose={() => setShowModal(false)}>
+          <div className="space-y-4">
+            {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อหมวดหมู่</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="เช่น สัตว์เลี้ยง, เกม"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">ไอคอน</label>
+              <div className="flex gap-2 flex-wrap">
+                {ICON_OPTS.map((ico) => (
+                  <button key={ico} onClick={() => setForm({ ...form, icon: ico })}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all"
+                    style={{
+                      background:  form.icon === ico ? form.color + '22' : '#f8fafc',
+                      borderColor: form.icon === ico ? form.color : '#e2e8f0',
+                    }}>
+                    <Icon name={ico} size={16} color={form.icon === ico ? form.color : '#94a3b8'} />
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-2 block">สี</label>
+              <div className="flex gap-2 flex-wrap">
+                {COLOR_OPTS.map((c) => (
+                  <button key={c} onClick={() => setForm({ ...form, color: c })}
+                    className="w-7 h-7 rounded-full border-2 transition-all"
+                    style={{ background: c, borderColor: form.color === c ? '#1e293b' : 'transparent' }} />
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowModal(false)} className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium">ยกเลิก</button>
+              <button onClick={save} disabled={saving} className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium disabled:opacity-60">
+                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}

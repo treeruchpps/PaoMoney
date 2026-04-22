@@ -31,7 +31,7 @@ func (h *CategoryHandler) List(c *gin.Context) {
 		query += " AND type = $2"
 		args = append(args, typeFilter)
 	}
-	query += " ORDER BY user_id NULLS FIRST, name ASC"
+	query += " ORDER BY user_id NULLS FIRST, created_at ASC"
 
 	rows, err := h.db.Query(context.Background(), query, args...)
 	if err != nil {

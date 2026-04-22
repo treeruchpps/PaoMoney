@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import './index.css';
 
 import { AuthProvider, useAuth }  from './contexts/AuthContext';
-import { accounts as accountsApi, categories as categoriesApi } from './services/api';
+import { accounts as accountsApi, categories as categoriesApi, notifications as notiApi, getAccessToken } from './services/api';
 
 import LoginPage        from './pages/LoginPage';
 import RegisterPage     from './pages/RegisterPage';
@@ -16,6 +16,7 @@ import AccountsView     from './views/AccountsView';
 import TransactionsView from './views/TransactionsView';
 import BudgetsView      from './views/BudgetsView';
 import GoalsView        from './views/GoalsView';
+import RecurringView    from './views/RecurringView';
 import CategoriesView   from './views/CategoriesView';
 import ProfileView      from './views/ProfileView';
 
@@ -26,7 +27,7 @@ function Spinner() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-3">
-        <div className="w-10 h-10 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+        <div className="w-10 h-10 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
         <p className="text-sm text-slate-500">กำลังโหลด...</p>
       </div>
     </div>
@@ -40,8 +41,9 @@ function AppShell() {
   const [appState, setAppState]     = useState('checking'); // 'checking'|'setup'|'app'
   const [view, setView]             = useState('analytics');
   const [collapsed, setCollapsed]   = useState(false);
-  const [accounts, setAccounts]     = useState([]);
-  const [categories, setCategories] = useState([]);
+  const [accounts,      setAccounts]      = useState([]);
+  const [categories,    setCategories]    = useState([]);
+  const [notiList,      setNotiList]      = useState([]);
 
   // Bootstrap: check if user has accounts already
   const bootstrap = useCallback(async () => {
@@ -51,16 +53,24 @@ function AppShell() {
         accountsApi.list(),
         categoriesApi.list(),
       ]);
+      // token ถูก clear (401 + refresh fail) → redirect กำลังเกิด ไม่ต้อง set state
+      if (!getAccessToken()) return;
       setAccounts(accs || []);
       setCategories(cats || []);
       setAppState(accs && accs.length > 0 ? 'app' : 'setup');
+      // โหลด notifications (generate จาก recurring ที่ครบกำหนดด้วย)
+      notiApi.list().then((n) => setNotiList(n || [])).catch(() => {});
     } catch {
+      if (!getAccessToken()) return; // unauthorized → redirect happening
       setAppState('setup');
     }
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated) bootstrap();
+    if (isAuthenticated) {
+      setView('analytics'); // always start at dashboard on login
+      bootstrap();
+    }
   }, [isAuthenticated, bootstrap]);
 
   // Refresh accounts (called by views after CRUD)
@@ -68,6 +78,14 @@ function AppShell() {
     try {
       const accs = await accountsApi.list();
       setAccounts(accs || []);
+    } catch {}
+  }, []);
+
+  // Refresh notifications (generate + fetch)
+  const refreshNotifications = useCallback(async () => {
+    try {
+      const list = await notiApi.list();
+      setNotiList(list || []);
     } catch {}
   }, []);
 
@@ -114,7 +132,13 @@ function AppShell() {
         setCollapsed={setCollapsed}
       />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <Topbar pageTitle={pageTitle} onProfile={() => setView('profile')} />
+        <Topbar
+          pageTitle={pageTitle}
+          onProfile={() => setView('profile')}
+          notifications={notiList}
+          onNotificationRefresh={refreshNotifications}
+          onRefreshAccounts={refreshAccounts}
+        />
         <main className="flex-1 overflow-y-auto">
           {view === 'analytics'    && (
             <AnalyticsView accounts={accounts} categories={categories} />
@@ -137,6 +161,13 @@ function AppShell() {
           )}
           {view === 'goals'        && (
             <GoalsView accounts={accounts} onRefreshAccounts={refreshAccounts} />
+          )}
+          {view === 'recurring'    && (
+            <RecurringView
+              accounts={accounts}
+              categories={categories}
+              onNotificationRefresh={refreshNotifications}
+            />
           )}
           {view === 'categories'   && (
             <CategoriesView onRefresh={refreshCategories} />

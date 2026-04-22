@@ -1,7 +1,8 @@
+import { createPortal } from 'react-dom';
 import Icon from './Icon';
 
 export default function Modal({ title, onClose, children }) {
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center modal-bg"
       style={{ background: 'rgba(15,23,42,0.45)' }}
@@ -18,6 +19,7 @@ export default function Modal({ title, onClose, children }) {
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

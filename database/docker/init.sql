@@ -101,6 +101,7 @@ CREATE TABLE transactions (
     name             VARCHAR(100),
     note             TEXT,
     transaction_date DATE             NOT NULL DEFAULT CURRENT_DATE,
+    is_recurring     BOOLEAN          NOT NULL DEFAULT FALSE,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -141,6 +142,44 @@ CREATE TABLE budgets (
 );
 
 -- ============================================================
+-- ตาราง recurring_transactions
+-- ============================================================
+CREATE TYPE recur_frequency AS ENUM ('daily', 'weekly', 'monthly', 'yearly');
+
+CREATE TABLE recurring_transactions (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id        UUID             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    account_id     UUID             NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    to_account_id  UUID             REFERENCES accounts(id),
+    category_id    UUID             REFERENCES categories(id) ON DELETE SET NULL,
+    type           transaction_type NOT NULL,
+    amount         NUMERIC(15, 2)   NOT NULL CHECK (amount > 0),
+    name           VARCHAR(100),
+    note           TEXT,
+    frequency      recur_frequency  NOT NULL DEFAULT 'monthly',
+    day_of_month   SMALLINT,        -- สำหรับ monthly: 1-31
+    day_of_week    SMALLINT,        -- สำหรับ weekly: 0=อาทิตย์ 6=เสาร์
+    next_due_date  DATE             NOT NULL,
+    is_active      BOOLEAN          NOT NULL DEFAULT TRUE,
+    created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- ตาราง notifications
+-- ============================================================
+CREATE TABLE notifications (
+    id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id        UUID             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recurring_id   UUID             REFERENCES recurring_transactions(id) ON DELETE CASCADE,
+    title          VARCHAR(200)     NOT NULL,
+    message        TEXT,
+    is_read        BOOLEAN          NOT NULL DEFAULT FALSE,
+    action_taken   BOOLEAN          NOT NULL DEFAULT FALSE,
+    created_at     TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
 -- INDEXES
 -- ============================================================
 CREATE INDEX idx_users_email           ON users(email);
@@ -151,8 +190,12 @@ CREATE INDEX idx_transactions_account  ON transactions(account_id);
 CREATE INDEX idx_transactions_date     ON transactions(transaction_date);
 CREATE INDEX idx_savings_goals_user_id ON savings_goals(user_id);
 CREATE INDEX idx_savings_goals_status  ON savings_goals(status);
-CREATE INDEX idx_budgets_user_id       ON budgets(user_id);
-CREATE INDEX idx_budgets_category_id   ON budgets(category_id);
+CREATE INDEX idx_budgets_user_id             ON budgets(user_id);
+CREATE INDEX idx_budgets_category_id         ON budgets(category_id);
+CREATE INDEX idx_recurring_user_id           ON recurring_transactions(user_id);
+CREATE INDEX idx_recurring_next_due          ON recurring_transactions(next_due_date);
+CREATE INDEX idx_notifications_user_id       ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read       ON notifications(user_id, is_read);
 
 -- ============================================================
 -- FUNCTION + TRIGGER: auto-update updated_at
@@ -189,6 +232,10 @@ CREATE TRIGGER trg_budgets_updated_at
     BEFORE UPDATE ON budgets
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER trg_recurring_updated_at
+    BEFORE UPDATE ON recurring_transactions
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- ============================================================
 -- TRIGGER: สร้าง user_profiles อัตโนมัติเมื่อ insert users
 -- ============================================================
@@ -209,19 +256,35 @@ CREATE TRIGGER trg_create_user_profile
 -- DEFAULT CATEGORIES
 -- ============================================================
 INSERT INTO categories (id, user_id, name, type, icon, color) VALUES
-    (uuid_generate_v4(), NULL, 'เงินเดือน',        'income',   'Briefcase',       '#10b981'),
-    (uuid_generate_v4(), NULL, 'รายได้พิเศษ',      'income',   'Star',            '#f59e0b'),
-    (uuid_generate_v4(), NULL, 'ฟรีแลนซ์',         'income',   'Laptop',          '#6366f1'),
-    (uuid_generate_v4(), NULL, 'อาหาร',             'expense',  'UtensilsCrossed', '#f97316'),
-    (uuid_generate_v4(), NULL, 'เดินทาง',           'expense',  'Car',             '#3b82f6'),
-    (uuid_generate_v4(), NULL, 'ที่พัก',            'expense',  'Home',            '#84cc16'),
-    (uuid_generate_v4(), NULL, 'สุขภาพ',            'expense',  'Heart',           '#ef4444'),
-    (uuid_generate_v4(), NULL, 'ช้อปปิ้ง',          'expense',  'ShoppingBag',     '#ec4899'),
-    (uuid_generate_v4(), NULL, 'บันเทิง',           'expense',  'Tv',              '#8b5cf6'),
-    (uuid_generate_v4(), NULL, 'บิล/สาธารณูปโภค',  'expense',  'Zap',             '#eab308'),
-    (uuid_generate_v4(), NULL, 'การศึกษา',          'expense',  'GraduationCap',   '#06b6d4'),
-    (uuid_generate_v4(), NULL, 'อื่นๆ',             'expense',  'Tag',             '#94a3b8'),
-    (uuid_generate_v4(), NULL, 'ชำระบัตรเครดิต',   'transfer', 'CreditCard',      '#ef4444'),
-    (uuid_generate_v4(), NULL, 'โอนเก็บออม',        'transfer', 'PiggyBank',       '#10b981'),
-    (uuid_generate_v4(), NULL, 'ชำระเงินกู้',       'transfer', 'Landmark',        '#f59e0b'),
-    (uuid_generate_v4(), NULL, 'โอนเงิน',           'transfer', 'ArrowLeftRight',  '#6366f1');
+    -- รายจ่าย (expense) — เรียงตามลำดับที่กำหนด
+    (uuid_generate_v4(), NULL, 'อาหารและเครื่องดื่ม', 'expense', 'UtensilsCrossed', '#f97316'),
+    (uuid_generate_v4(), NULL, 'เครื่องแต่งกาย',      'expense', 'ShoppingBag',     '#ec4899'),
+    (uuid_generate_v4(), NULL, 'ที่อยู่อาศัย',        'expense', 'Home',            '#84cc16'),
+    (uuid_generate_v4(), NULL, 'การเดินทาง',           'expense', 'Car',             '#3b82f6'),
+    (uuid_generate_v4(), NULL, 'การสื่อสาร',           'expense', 'Smartphone',      '#06b6d4'),
+    (uuid_generate_v4(), NULL, 'บันเทิง',              'expense', 'Tv',              '#8b5cf6'),
+    (uuid_generate_v4(), NULL, 'การศึกษา',             'expense', 'GraduationCap',   '#6366f1'),
+    (uuid_generate_v4(), NULL, 'ของขวัญ',              'expense', 'Gift',            '#f59e0b'),
+    (uuid_generate_v4(), NULL, 'การบริจาค',            'expense', 'Heart',           '#ef4444'),
+    (uuid_generate_v4(), NULL, 'ของใช้',               'expense', 'Monitor',         '#94a3b8'),
+    (uuid_generate_v4(), NULL, 'การแพทย์',             'expense', 'Shield',          '#ef4444'),
+    (uuid_generate_v4(), NULL, 'การดูแลสุขภาพ',        'expense', 'Zap',             '#10b981'),
+    (uuid_generate_v4(), NULL, 'การเงิน',              'expense', 'DollarSign',      '#6366f1'),
+    (uuid_generate_v4(), NULL, 'ประกัน',               'expense', 'Landmark',        '#3b82f6'),
+    (uuid_generate_v4(), NULL, 'อื่นๆ',                'expense', 'Tag',             '#94a3b8'),
+    -- รายรับ (income)
+    (uuid_generate_v4(), NULL, 'เงินเดือน',            'income',  'Briefcase',       '#10b981'),
+    (uuid_generate_v4(), NULL, 'รายได้พิเศษ',          'income',  'Star',            '#f59e0b'),
+    (uuid_generate_v4(), NULL, 'โบนัส',                'income',  'Gift',            '#6366f1'),
+    (uuid_generate_v4(), NULL, 'ค่าล่วงเวลา',          'income',  'Zap',             '#f97316'),
+    (uuid_generate_v4(), NULL, 'การลงทุน',             'income',  'DollarSign',      '#3b82f6'),
+    (uuid_generate_v4(), NULL, 'อื่นๆ',                'income',  'Tag',             '#94a3b8'),
+    -- การโอน (transfer)
+    (uuid_generate_v4(), NULL, 'โอนผ่านธนาคาร',        'transfer','ArrowLeftRight',  '#6366f1'),
+    (uuid_generate_v4(), NULL, 'ชำระบัตรเครดิต',       'transfer','CreditCard',      '#ef4444'),
+    (uuid_generate_v4(), NULL, 'ฝากและถอน',            'transfer','PiggyBank',       '#10b981'),
+    (uuid_generate_v4(), NULL, 'การยืมเงิน',           'transfer','Banknote',        '#f59e0b'),
+    (uuid_generate_v4(), NULL, 'การให้ยืมเงิน',        'transfer','Wallet',          '#3b82f6'),
+    (uuid_generate_v4(), NULL, 'การชำระคืน',           'transfer','Landmark',        '#f97316'),
+    (uuid_generate_v4(), NULL, 'การเรียกเก็บหนี้',     'transfer','DollarSign',      '#ec4899'),
+    (uuid_generate_v4(), NULL, 'อื่นๆ',                'transfer','Tag',             '#94a3b8');

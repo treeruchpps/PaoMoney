@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import Icon from '../components/common/Icon';
 import Modal from '../components/common/Modal';
-import { transactions as txApi } from '../services/api';
+import { transactions as txApi, accounts as accountsApi } from '../services/api';
 import { fmt } from '../constants/data';
 
 const TYPE_LABEL = { income: 'รายรับ', expense: 'รายจ่าย', transfer: 'โอนเงิน', adjustment: 'ปรับยอด' };
-const TYPE_COLOR = { income: '#10b981', expense: '#ef4444', transfer: '#6366f1', adjustment: '#f59e0b' };
-const TYPE_BG    = { income: '#f0fdf4', expense: '#fff1f2', transfer: '#eef2ff', adjustment: '#fffbeb' };
+const TYPE_COLOR = { income: '#10b981', expense: '#ef4444', transfer: '#3b82f6', adjustment: '#f59e0b' };
+const TYPE_BG    = { income: '#f0fdf4', expense: '#fff1f2', transfer: '#eff6ff', adjustment: '#fffbeb' };
 const TYPE_ICON  = { income: 'ArrowUp', expense: 'ArrowDown', transfer: 'ArrowLeftRight', adjustment: 'SlidersHorizontal' };
 const DAY_TH     = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -70,12 +70,12 @@ function CalendarView({ txList, filterMonth, getAcc, getCat, onRemove }) {
               <button key={idx}
                 onClick={() => setSelectedDate(isSelected ? null : dateStr)}
                 className={`h-24 p-2 text-left transition-colors border-0
-                  ${isSelected ? 'bg-indigo-50 ring-2 ring-inset ring-indigo-300' : 'hover:bg-slate-50'}`}
+                  ${isSelected ? 'bg-blue-50 ring-2 ring-inset ring-blue-300' : 'hover:bg-slate-50'}`}
               >
                 {/* Day number */}
                 <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full mb-1
                   ${isToday
-                    ? 'bg-indigo-500 text-white'
+                    ? 'bg-blue-500 text-white'
                     : dow === 0
                       ? 'text-red-400'
                       : dow === 6
@@ -194,6 +194,15 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
   });
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
+  const [editId, setEditId] = useState(null); // null = create, uuid = edit
+
+  // ── Adjust-balance modal (for adjustment-type tx) ─────────────────────────
+  const [showAdjustModal, setShowAdjustModal] = useState(false);
+  const [adjustTxId,      setAdjustTxId]      = useState(null);
+  const [adjustAcc,       setAdjustAcc]       = useState(null);
+  const [adjustBalance,   setAdjustBalance]   = useState('');
+  const [adjustSaving,    setAdjustSaving]    = useState(false);
+  const [adjustError,     setAdjustError]     = useState('');
 
   // ── Fetch (no pagination: limit=1000) ────────────────────────────────────
   const fetchTx = useCallback(async () => {
@@ -248,6 +257,7 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
   // ── Add transaction ───────────────────────────────────────────────────────
   const openAdd = (type) => {
     setTxType(type);
+    setEditId(null);
     setError('');
     const cats = type === 'income'
       ? applyOrder('income',   incCats)
@@ -263,6 +273,77 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
       transaction_date: today,
     });
     setShowModal(true);
+  };
+
+  // ── Edit transaction ──────────────────────────────────────────────────────
+  const openEdit = (tx) => {
+    // Adjustment → เปิด modal ปรับยอดบัญชีตรงๆ เหมือนหน้าบัญชี/กระเป๋าเงิน
+    if (tx.type === 'adjustment') {
+      const acc = accounts.find((a) => a.id === tx.account_id);
+      if (!acc) return;
+      setAdjustTxId(tx.id);
+      setAdjustAcc(acc);
+      setAdjustBalance(String(acc.balance));
+      setAdjustError('');
+      setShowAdjustModal(true);
+      return;
+    }
+    setTxType(tx.type);
+    setEditId(tx.id);
+    setError('');
+    setForm({
+      name:             tx.name  || '',
+      amount:           String(tx.amount),
+      note:             tx.note  || '',
+      category_id:      tx.category_id      || '',
+      account_id:       tx.account_id       || accounts[0]?.id || '',
+      from_account_id:  tx.account_id       || accounts[0]?.id || '',
+      to_account_id:    tx.to_account_id    || accounts[1]?.id || accounts[0]?.id || '',
+      transaction_date: tx.transaction_date?.slice(0, 10) || today,
+    });
+    setShowModal(true);
+  };
+
+  // ── Save adjust balance ───────────────────────────────────────────────────
+  const saveAdjust = async () => {
+    const newBalance = parseFloat(adjustBalance);
+    if (isNaN(newBalance) || newBalance < 0) { setAdjustError('กรุณาใส่ยอดเงินให้ถูกต้อง'); return; }
+    setAdjustSaving(true);
+    setAdjustError('');
+    try {
+      const oldBalance = adjustAcc.balance;
+      const diff       = newBalance - oldBalance;
+
+      // อัปเดต balance บัญชีตรงๆ
+      await accountsApi.update(adjustAcc.id, {
+        name:    adjustAcc.name,
+        type:    adjustAcc.type,
+        kind:    adjustAcc.kind,
+        balance: newBalance,
+        currency: adjustAcc.currency,
+      });
+
+      // ลบ adjustment เดิม แล้วสร้างใหม่ถ้ายอดเปลี่ยน
+      await txApi.delete(adjustTxId).catch(() => {});
+      if (Math.abs(diff) >= 0.01) {
+        await txApi.create({
+          type:             'adjustment',
+          amount:           Math.abs(diff),
+          account_id:       adjustAcc.id,
+          transaction_date: today,
+          note: diff > 0
+            ? `ปรับยอดเพิ่ม (${oldBalance.toLocaleString()} → ${newBalance.toLocaleString()})`
+            : `ปรับยอดลด (${oldBalance.toLocaleString()} → ${newBalance.toLocaleString()})`,
+        }).catch(() => {});
+      }
+
+      await Promise.all([fetchTx(), onRefreshAccounts?.()]);
+      setShowAdjustModal(false);
+    } catch (err) {
+      setAdjustError(err.message);
+    } finally {
+      setAdjustSaving(false);
+    }
   };
 
   const save = async () => {
@@ -285,8 +366,13 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
         body.account_id  = form.account_id;
         body.category_id = form.category_id || null;
       }
-      await txApi.create(body);
+      if (editId) {
+        await txApi.update(editId, body);
+      } else {
+        await txApi.create(body);
+      }
       await Promise.all([fetchTx(), onRefreshAccounts?.()]);
+      setEditId(null);
       setShowModal(false);
     } catch (err) {
       setError(err.message);
@@ -346,10 +432,10 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
     return nameMatch || noteMatch || amountMatch;
   });
 
-  // ── Summary ───────────────────────────────────────────────────────────────
-  const totalIncome  = txList.filter((t) => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
-  const totalExpense = txList.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-  const net = totalIncome - totalExpense;
+  // ── Summary (from accounts) ───────────────────────────────────────────────
+  const totalAssets = (accounts || []).filter((a) => a.type === 'asset').reduce((s, a) => s + a.balance, 0);
+  const totalLiab   = (accounts || []).filter((a) => a.type === 'liability').reduce((s, a) => s + a.balance, 0);
+  const netWorth    = totalAssets - totalLiab;
 
   return (
     <div className="p-6 space-y-5">
@@ -357,15 +443,15 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
       {/* ── Summary cards ─────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'รายรับ',  value: totalIncome, color: '#10b981', bg: '#f0fdf4' },
-          { label: 'รายจ่าย', value: totalExpense, color: '#ef4444', bg: '#fff1f2' },
           {
-            label: 'คงเหลือ', value: net,
-            color: net >= 0 ? '#6366f1' : '#ef4444',
-            bg:    net >= 0 ? '#eef2ff' : '#fff1f2',
+            label: 'มูลค่าสุทธิ', value: netWorth,
+            color: netWorth >= 0 ? '#3b82f6' : '#ef4444',
+            bg:    netWorth >= 0 ? '#eff6ff' : '#fff1f2',
           },
+          { label: 'สินทรัพย์รวม', value: totalAssets, color: '#10b981', bg: '#f0fdf4' },
+          { label: 'หนี้สินรวม',   value: totalLiab,   color: '#ef4444', bg: '#fff1f2' },
         ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-4" style={{ background: s.bg }}>
+          <div key={i} className="rounded-2xl p-4 border" style={{ background: s.bg, borderColor: s.color + '40' }}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
             <p className="text-xl font-bold" style={{ color: s.color }}>
               {s.value < 0 ? '-' : ''}฿{fmt(s.value)}
@@ -395,9 +481,9 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
             ].map(({ mode, icon, title }) => (
               <button key={mode} onClick={() => setViewMode(mode)} title={title}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                  viewMode === mode ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                  viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'
                 }`}>
-                <Icon name={icon} size={15} color={viewMode === mode ? '#6366f1' : '#94a3b8'} />
+                <Icon name={icon} size={15} color={viewMode === mode ? '#3b82f6' : '#94a3b8'} />
               </button>
             ))}
           </div>
@@ -498,7 +584,17 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
                       <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">
                         {tx.transaction_date?.slice(0, 10) || ''}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-700 font-medium">{tx.name || '—'}</td>
+                      <td className="px-4 py-3 text-xs text-slate-700 font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <span>{tx.name || '—'}</span>
+                          {tx.is_recurring && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold whitespace-nowrap flex-shrink-0"
+                              style={{ background: '#eff6ff', color: '#3b82f6' }}>
+                              ประจำ
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       <td className="px-4 py-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-medium whitespace-nowrap"
                           style={{ color: TYPE_COLOR[tx.type], background: TYPE_BG[tx.type] }}>
@@ -517,10 +613,16 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
                         {tx.type === 'expense' ? '-' : tx.type === 'adjustment' ? '' : '+'}฿{fmt(tx.amount)}
                       </td>
                       <td className="px-4 py-2">
-                        <button onClick={() => remove(tx.id)}
-                          className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-                          <Icon name="Trash2" size={11} color="#94a3b8" />
-                        </button>
+                        <div className="flex gap-1">
+                          <button onClick={() => openEdit(tx)}
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                            <Icon name="Edit" size={11} color="#94a3b8" />
+                          </button>
+                          <button onClick={() => remove(tx.id)}
+                            className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
+                            <Icon name="Trash2" size={11} color="#94a3b8" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -533,7 +635,10 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
 
       {/* ── Modal: เพิ่มรายการ ────────────────────────────────────────────── */}
       {showModal && (
-        <Modal title={`เพิ่ม${TYPE_LABEL[txType]}`} onClose={() => setShowModal(false)}>
+        <Modal
+          title={editId ? `แก้ไข${TYPE_LABEL[txType]}` : `เพิ่ม${TYPE_LABEL[txType]}`}
+          onClose={() => { setShowModal(false); setEditId(null); }}
+        >
           <div className="space-y-4">
             {error && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{error}</p>}
 
@@ -615,13 +720,57 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
             </div>
 
             <div className="flex gap-3 pt-2">
-              <button onClick={() => setShowModal(false)}
+              <button onClick={() => { setShowModal(false); setEditId(null); }}
                 className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
                 ยกเลิก
               </button>
               <button onClick={save} disabled={saving}
                 className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium disabled:opacity-60">
-                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
+                {saving ? 'กำลังบันทึก...' : editId ? 'บันทึกการแก้ไข' : 'บันทึก'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: ปรับยอดบัญชี (adjustment) ───────────────────────────────── */}
+      {showAdjustModal && adjustAcc && (
+        <Modal
+          title={`ปรับยอดบัญชี: ${adjustAcc.name}`}
+          onClose={() => setShowAdjustModal(false)}
+        >
+          <div className="space-y-4">
+            {adjustError && (
+              <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{adjustError}</p>
+            )}
+
+            {/* ยอดปัจจุบัน */}
+            <div className="bg-slate-50 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-xs text-slate-500">ยอดปัจจุบัน</span>
+              <span className="text-base font-bold text-slate-700">฿{fmt(adjustAcc.balance)}</span>
+            </div>
+
+            {/* ยอดใหม่ */}
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">ยอดใหม่ (฿)</label>
+              <input
+                type="number"
+                value={adjustBalance}
+                onChange={(e) => setAdjustBalance(e.target.value)}
+                placeholder="0.00"
+                min="0"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-lg font-bold bg-slate-50 text-slate-700"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button onClick={() => setShowAdjustModal(false)}
+                className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
+                ยกเลิก
+              </button>
+              <button onClick={saveAdjust} disabled={adjustSaving}
+                className="flex-1 btn-primary text-white py-2.5 rounded-xl text-sm font-medium disabled:opacity-60">
+                {adjustSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
           </div>

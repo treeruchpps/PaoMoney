@@ -5,11 +5,11 @@ export default function SetupAccountPage({ onComplete }) {
   const { user, logout } = useAuth();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md text-center">
 
         {/* Logo */}
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
+        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
           <Icon name="Wallet" size={38} color="white" />
         </div>
 
@@ -17,7 +17,7 @@ export default function SetupAccountPage({ onComplete }) {
         <h1 className="text-3xl font-bold text-slate-800 mb-2">
           ยินดีต้อนรับ 🎉
         </h1>
-        <p className="text-lg font-semibold text-indigo-600 mb-2">{user?.username}</p>
+        <p className="text-lg font-semibold text-blue-600 mb-2">{user?.username}</p>
         <p className="text-slate-500 text-sm leading-relaxed mb-8">
           บัญชี PaoMoney ของคุณพร้อมใช้งานแล้ว<br />
           เริ่มจัดการการเงินส่วนตัวได้เลย

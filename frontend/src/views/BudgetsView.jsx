@@ -188,11 +188,11 @@ export default function BudgetsView({ categories }) {
             </div>
             <p className="text-xs text-slate-400 mt-1.5">คงเหลือ ฿{fmt(Math.max(0, totalLimit - totalSpent))}</p>
           </div>
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-2xl p-5 text-white flex flex-col justify-between">
-            <p className="text-indigo-100 text-xs font-medium">งบรายวันที่เหลือ</p>
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white flex flex-col justify-between">
+            <p className="text-blue-100 text-xs font-medium">งบรายวันที่เหลือ</p>
             <div>
               <p className="text-3xl font-bold mt-1">฿{Math.round(dailyLeft).toLocaleString()}</p>
-              <p className="text-indigo-200 text-xs mt-1">เหลืออีก {daysLeft} วัน</p>
+              <p className="text-blue-200 text-xs mt-1">เหลืออีก {daysLeft} วัน</p>
             </div>
           </div>
         </div>
@@ -236,8 +236,8 @@ export default function BudgetsView({ categories }) {
                     <span className="text-xs font-bold px-2 py-0.5 rounded-full"
                       style={{ color, background: bg }}>{pct}%</span>
                     <button onClick={() => openEdit(b)}
-                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-indigo-100 flex items-center justify-center transition-colors">
-                      <Icon name="Pencil" size={11} color="#6366f1" />
+                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                      <Icon name="Edit" size={11} color="#94a3b8" />
                     </button>
                     <button onClick={() => remove(b.id)}
                       className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">

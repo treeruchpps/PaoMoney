@@ -152,3 +152,23 @@ export const budgets = {
   update: (id, body) => request(`/budgets/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id)       => request(`/budgets/${id}`, { method: 'DELETE' }),
 };
+
+// ====================================================
+// RECURRING TRANSACTIONS
+// ====================================================
+export const recurring = {
+  list:   ()         => request('/recurring'),
+  create: (body)     => request('/recurring',     { method: 'POST',   body: JSON.stringify(body) }),
+  update: (id, body) => request(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  delete: (id)       => request(`/recurring/${id}`, { method: 'DELETE' }),
+};
+
+// ====================================================
+// NOTIFICATIONS
+// ====================================================
+export const notifications = {
+  list:    ()   => request('/notifications'),
+  confirm: (id) => request(`/notifications/${id}/confirm`, { method: 'POST' }),
+  skip:    (id) => request(`/notifications/${id}/skip`,    { method: 'POST' }),
+  readAll: ()   => request('/notifications/read-all',      { method: 'PUT'  }),
+};

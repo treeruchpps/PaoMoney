@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Icon from '../components/common/Icon';
 import Modal from '../components/common/Modal';
 import { accounts as accountsApi, transactions as txApi } from '../services/api';
@@ -9,7 +9,7 @@ const todayStr = () => new Date().toISOString().slice(0, 10);
 // ─── Kind metadata (with type tag) ────────────────────────────────────────────
 const KINDS = [
   { value: 'cash',         label: 'เงินสด',      icon: 'DollarSign', color: '#10b981', type: 'asset' },
-  { value: 'bank_account', label: 'บัญชีธนาคาร', icon: 'Briefcase',  color: '#6366f1', type: 'asset' },
+  { value: 'bank_account', label: 'บัญชีธนาคาร', icon: 'Briefcase',  color: '#3b82f6', type: 'asset' },
   { value: 'savings',      label: 'ออมทรัพย์',    icon: 'Star',       color: '#f59e0b', type: 'asset' },
   { value: 'e_wallet',     label: 'E-Wallet',     icon: 'Smartphone', color: '#3b82f6', type: 'asset' },
   { value: 'investment',   label: 'การลงทุน',     icon: 'TrendingUp', color: '#8b5cf6', type: 'asset' },
@@ -37,7 +37,7 @@ export default function AccountsView({ accounts, onRefresh }) {
   const [saving, setSaving]             = useState(false);
   const [error, setError]               = useState('');
 
-  // Distribute ("โยนเงินเข้ากระเป๋า") modal
+  // Distribute ("แจกจ่ายเข้าบัญชี") modal
   const [showDist, setShowDist]         = useState(false);
   const [poolAmount, setPoolAmount]     = useState('');
   const [distDate, setDistDate]         = useState(todayStr());
@@ -209,8 +209,8 @@ export default function AccountsView({ accounts, onRefresh }) {
           </div>
           <div className="flex gap-1">
             <button onClick={() => openEdit(acc)}
-              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-indigo-100 flex items-center justify-center transition-colors">
-              <Icon name="Pencil" size={12} color="#64748b" />
+              className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
+              <Icon name="Edit" size={12} color="#64748b" />
             </button>
             <button onClick={() => remove(acc.id)}
               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
@@ -233,13 +233,13 @@ export default function AccountsView({ accounts, onRefresh }) {
           {
             label: 'มูลค่าสุทธิ',
             value: netWorth,
-            color: netWorth >= 0 ? '#6366f1' : '#ef4444',
-            bg:    netWorth >= 0 ? '#eef2ff' : '#fff1f2',
+            color: netWorth >= 0 ? '#3b82f6' : '#ef4444',
+            bg:    netWorth >= 0 ? '#eff6ff' : '#fff1f2',
           },
           { label: 'สินทรัพย์รวม', value: totalAssets, color: '#10b981', bg: '#f0fdf4' },
           { label: 'หนี้สินรวม',   value: totalLiab,   color: '#ef4444', bg: '#fff1f2' },
         ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-4 card-hover" style={{ background: s.bg }}>
+          <div key={i} className="rounded-2xl p-4 card-hover border" style={{ background: s.bg, borderColor: s.color + '40' }}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
             <p className="text-2xl font-bold" style={{ color: s.color }}>
               {s.value < 0 ? '-' : ''}฿{fmt(s.value)}
@@ -256,8 +256,8 @@ export default function AccountsView({ accounts, onRefresh }) {
           {assetAccounts.length > 0 && (
             <button onClick={openDist}
               className="text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium border-2 transition-colors"
-              style={{ color: '#6366f1', borderColor: '#c7d2fe', background: '#eef2ff' }}>
-              <Icon name="Share2" size={15} color="#6366f1" />
+              style={{ color: '#3b82f6', borderColor: '#bfdbfe', background: '#eff6ff' }}>
+              <Icon name="Share2" size={15} color="#3b82f6" />
               แบ่งเงินเข้ากระเป๋า
             </button>
           )}
@@ -417,7 +417,7 @@ export default function AccountsView({ accounts, onRefresh }) {
               <div>
                 <div className="flex justify-between text-xs mb-1.5">
                   <span className="text-slate-500">จัดสรรแล้ว</span>
-                  <span className={`font-semibold ${distValid ? 'text-emerald-600' : remaining < 0 ? 'text-red-500' : 'text-indigo-500'}`}>
+                  <span className={`font-semibold ${distValid ? 'text-emerald-600' : remaining < 0 ? 'text-red-500' : 'text-blue-500'}`}>
                     ฿{fmt(allocated)} / ฿{fmt(pool)}
                     {!distValid && remaining !== 0 && (
                       <span className="ml-2 font-normal text-slate-400">
@@ -428,7 +428,7 @@ export default function AccountsView({ accounts, onRefresh }) {
                 </div>
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div
-                    className={`h-full rounded-full transition-all ${remaining < 0 ? 'bg-red-400' : distValid ? 'bg-emerald-400' : 'bg-indigo-400'}`}
+                    className={`h-full rounded-full transition-all ${remaining < 0 ? 'bg-red-400' : distValid ? 'bg-emerald-400' : 'bg-blue-400'}`}
                     style={{ width: `${Math.min((allocated / pool) * 100, 100)}%` }}
                   />
                 </div>
@@ -468,8 +468,8 @@ export default function AccountsView({ accounts, onRefresh }) {
                         {pool > 0 && remaining > 0 && (
                           <button onClick={() => fillRemaining(idx)}
                             title="เติมยอดที่เหลือ"
-                            className="w-6 h-6 rounded-lg bg-indigo-50 hover:bg-indigo-100 flex items-center justify-center transition-colors flex-shrink-0">
-                            <Icon name="Plus" size={11} color="#6366f1" />
+                            className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors flex-shrink-0">
+                            <Icon name="Plus" size={11} color="#3b82f6" />
                           </button>
                         )}
                       </div>

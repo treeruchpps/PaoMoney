@@ -41,7 +41,7 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	dateFrom := c.Query("date_from")
 	dateTo := c.Query("date_to")
 
-	query := `SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at
+	query := `SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, is_recurring, created_at, updated_at
 			  FROM transactions WHERE user_id = $1`
 	args := []interface{}{userID}
 	idx := 2
@@ -82,7 +82,7 @@ func (h *TransactionHandler) List(c *gin.Context) {
 	for rows.Next() {
 		var t models.Transaction
 		if err := rows.Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-			&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt); err != nil {
+			&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.IsRecurring, &t.CreatedAt, &t.UpdatedAt); err != nil {
 			continue
 		}
 		transactions = append(transactions, t)
@@ -128,12 +128,12 @@ func (h *TransactionHandler) Create(c *gin.Context) {
 	// Insert transaction record
 	var t models.Transaction
 	err = dbTx.QueryRow(ctx,
-		`INSERT INTO transactions (user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at`,
+		`INSERT INTO transactions (user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, is_recurring)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE)
+		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, is_recurring, created_at, updated_at`,
 		userID, req.AccountID, req.ToAccountID, req.CategoryID, req.Type, req.Amount, req.Name, req.Note, txDate,
 	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.IsRecurring, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create transaction"})
 		return
@@ -212,11 +212,11 @@ func (h *TransactionHandler) Get(c *gin.Context) {
 
 	var t models.Transaction
 	err := h.db.QueryRow(context.Background(),
-		`SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at
+		`SELECT id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, is_recurring, created_at, updated_at
 		 FROM transactions WHERE id = $1 AND user_id = $2`,
 		id, userID,
 	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.IsRecurring, &t.CreatedAt, &t.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
@@ -227,6 +227,7 @@ func (h *TransactionHandler) Get(c *gin.Context) {
 }
 
 // PUT /api/v1/transactions/:id
+// reverse balance เดิม → update row → apply balance ใหม่ (ในธุรกรรมเดียวกัน)
 func (h *TransactionHandler) Update(c *gin.Context) {
 	userID := c.GetString("user_id")
 	id := c.Param("id")
@@ -247,8 +248,75 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 		txDate = &parsed
 	}
 
+	ctx := context.Background()
+
+	// 1. ดึงข้อมูล transaction เดิมเพื่อ reverse balance
+	var old models.Transaction
+	err := h.db.QueryRow(ctx,
+		`SELECT id, user_id, account_id, to_account_id, type, amount FROM transactions WHERE id = $1 AND user_id = $2`,
+		id, userID,
+	).Scan(&old.ID, &old.UserID, &old.AccountID, &old.ToAccountID, &old.Type, &old.Amount)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		return
+	}
+
+	// 2. เริ่ม DB transaction
+	dbTx, err := h.db.Begin(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to begin transaction"})
+		return
+	}
+	defer dbTx.Rollback(ctx)
+
+	// 3. Reverse balance เดิม (เหมือน delete)
+	switch old.Type {
+	case models.TransactionTypeIncome:
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+			old.Amount, old.AccountID, userID,
+		)
+	case models.TransactionTypeExpense:
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+			old.Amount, old.AccountID, userID,
+		)
+	case models.TransactionTypeTransfer:
+		if old.ToAccountID != nil {
+			_, err = dbTx.Exec(ctx,
+				`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+				old.Amount, old.AccountID, userID,
+			)
+			if err == nil {
+				var toAccType string
+				_ = dbTx.QueryRow(ctx,
+					`SELECT type FROM accounts WHERE id = $1 AND user_id = $2`,
+					*old.ToAccountID, userID,
+				).Scan(&toAccType)
+				if toAccType == "liability" {
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+						old.Amount, *old.ToAccountID, userID,
+					)
+				} else {
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+						old.Amount, *old.ToAccountID, userID,
+					)
+				}
+			}
+		}
+	case models.TransactionTypeAdjustment:
+		// ไม่มี balance ที่ต้อง reverse
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reverse old balance"})
+		return
+	}
+
+	// 4. Update transaction row
 	var t models.Transaction
-	err := h.db.QueryRow(context.Background(),
+	err = dbTx.QueryRow(ctx,
 		`UPDATE transactions
 		 SET category_id      = COALESCE($1, category_id),
 		     amount           = COALESCE($2, amount),
@@ -256,13 +324,63 @@ func (h *TransactionHandler) Update(c *gin.Context) {
 		     note             = COALESCE($4, note),
 		     transaction_date = COALESCE($5, transaction_date)
 		 WHERE id = $6 AND user_id = $7
-		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, created_at, updated_at`,
+		 RETURNING id, user_id, account_id, to_account_id, category_id, type, amount, name, note, transaction_date, is_recurring, created_at, updated_at`,
 		req.CategoryID, req.Amount, req.Name, req.Note, txDate, id, userID,
 	).Scan(&t.ID, &t.UserID, &t.AccountID, &t.ToAccountID, &t.CategoryID,
-		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.CreatedAt, &t.UpdatedAt)
-
+		&t.Type, &t.Amount, &t.Name, &t.Note, &t.TransactionDate, &t.IsRecurring, &t.CreatedAt, &t.UpdatedAt)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update transaction"})
+		return
+	}
+
+	// 5. Apply balance ใหม่ (เหมือน create แต่ใช้ค่าจาก t ที่ updated แล้ว)
+	switch t.Type {
+	case models.TransactionTypeIncome:
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+			t.Amount, t.AccountID, userID,
+		)
+	case models.TransactionTypeExpense:
+		_, err = dbTx.Exec(ctx,
+			`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+			t.Amount, t.AccountID, userID,
+		)
+	case models.TransactionTypeTransfer:
+		if t.ToAccountID != nil {
+			_, err = dbTx.Exec(ctx,
+				`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+				t.Amount, t.AccountID, userID,
+			)
+			if err == nil {
+				var toAccType string
+				_ = dbTx.QueryRow(ctx,
+					`SELECT type FROM accounts WHERE id = $1 AND user_id = $2`,
+					*t.ToAccountID, userID,
+				).Scan(&toAccType)
+				if toAccType == "liability" {
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND user_id = $3`,
+						t.Amount, *t.ToAccountID, userID,
+					)
+				} else {
+					_, err = dbTx.Exec(ctx,
+						`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND user_id = $3`,
+						t.Amount, *t.ToAccountID, userID,
+					)
+				}
+			}
+		}
+	case models.TransactionTypeAdjustment:
+		// ปรับยอด: ไม่เปลี่ยน balance
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to apply new balance"})
+		return
+	}
+
+	// 6. Commit
+	if err := dbTx.Commit(ctx); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit transaction"})
 		return
 	}
 

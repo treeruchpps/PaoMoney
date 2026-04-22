@@ -22,6 +22,7 @@ type Transaction struct {
 	Name            *string         `json:"name"`
 	Note            *string         `json:"note"`
 	TransactionDate time.Time       `json:"transaction_date"`
+	IsRecurring     bool            `json:"is_recurring"`
 	CreatedAt       time.Time       `json:"created_at"`
 	UpdatedAt       time.Time       `json:"updated_at"`
 }

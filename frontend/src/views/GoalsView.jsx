@@ -4,12 +4,12 @@ import Modal from '../components/common/Modal';
 import { savingsGoals as goalsApi } from '../services/api';
 import { fmt } from '../constants/data';
 
-const COLOR_OPTS = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#f97316'];
+const COLOR_OPTS = ['#3b82f6','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#f97316'];
 const ICON_OPTS  = ['Target','Smartphone','Plane','Shield','Monitor','Home','Car','Gift','Briefcase','Star','Heart','Umbrella'];
 
 const STATUS_LABEL = { in_progress: 'กำลังออม', completed: 'สำเร็จแล้ว', cancelled: 'ยกเลิก' };
-const STATUS_COLOR = { in_progress: '#6366f1', completed: '#10b981', cancelled: '#94a3b8' };
-const STATUS_BG    = { in_progress: '#eef2ff', completed: '#f0fdf4', cancelled: '#f1f5f9' };
+const STATUS_COLOR = { in_progress: '#3b82f6', completed: '#10b981', cancelled: '#94a3b8' };
+const STATUS_BG    = { in_progress: '#eff6ff', completed: '#f0fdf4', cancelled: '#f1f5f9' };
 
 function getMonthsLeft(deadline) {
   if (!deadline) return 1;
@@ -23,7 +23,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 const EMPTY_FORM = {
   name: '', target_amount: '', current_amount: '0', deadline: '',
-  account_id: '', icon: 'Target', color: '#6366f1', note: '',
+  account_id: '', icon: 'Target', color: '#3b82f6', note: '',
 };
 
 export default function GoalsView({ accounts, onRefreshAccounts }) {
@@ -72,7 +72,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
       deadline:       g.deadline?.slice(0, 10) || '',
       account_id:     g.account_id || '',
       icon:           g.icon || 'Target',
-      color:          g.color || '#6366f1',
+      color:          g.color || '#3b82f6',
       note:           g.note || '',
     });
     setError('');
@@ -156,7 +156,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
           </div>
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
             <p className="text-xs text-slate-400">ออมไปแล้ว</p>
-            <p className="text-xl font-bold text-indigo-600 mt-1">฿{fmt(totalCurrent)}</p>
+            <p className="text-xl font-bold text-blue-600 mt-1">฿{fmt(totalCurrent)}</p>
             <p className="text-xs text-slate-400 mt-0.5">จาก ฿{fmt(totalTarget)}</p>
           </div>
           <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
@@ -187,7 +187,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {goals.map((g) => {
-            const color   = g.color || '#6366f1';
+            const color   = g.color || '#3b82f6';
             const target  = g.target_amount;
             const current = g.current_amount;
             const pct     = target > 0 ? Math.min((current / target) * 100, 100) : 0;
@@ -218,8 +218,8 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                   <div className="flex items-center gap-1.5">
                     {!isDone && (
                       <button onClick={() => openEdit(g)}
-                        className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-indigo-100 flex items-center justify-center transition-colors">
-                        <Icon name="Pencil" size={11} color="#6366f1" />
+                        className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                        <Icon name="Edit" size={11} color="#94a3b8" />
                       </button>
                     )}
                     <button onClick={() => remove(g.id)}
@@ -251,7 +251,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                     <div className="flex items-center gap-2">
                       {acc && (
                         <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 rounded-xl px-2.5 py-2">
-                          <Icon name="Wallet" size={11} color="#6366f1" />
+                          <Icon name="Wallet" size={11} color="#3b82f6" />
                           {acc.name}
                         </div>
                       )}
@@ -406,7 +406,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                   const pct = g.target_amount > 0
                     ? Math.min(100, Math.round((g.current_amount / g.target_amount) * 100))
                     : 0;
-                  const color = g.color || '#6366f1';
+                  const color = g.color || '#3b82f6';
                   return (
                     <div className="bg-slate-50 rounded-xl p-3">
                       <div className="flex justify-between text-xs text-slate-500 mb-1.5">
@@ -474,7 +474,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                   </button>
                   <button onClick={doDeposit} disabled={depositSaving}
                     className="flex-1 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
-                    style={{ background: depositGoal.color || '#6366f1' }}>
+                    style={{ background: depositGoal.color || '#3b82f6' }}>
                     <Icon name="PiggyBank" size={15} color="white" />
                     {depositSaving ? 'กำลังบันทึก...' : 'ฝากเงิน'}
                   </button>

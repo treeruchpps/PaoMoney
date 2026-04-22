@@ -4,7 +4,7 @@ import Modal from '../components/common/Modal';
 import { categories as categoriesApi } from '../services/api';
 
 const ICON_OPTS  = ['UtensilsCrossed','Car','ShoppingBag','Tv','Heart','Zap','GraduationCap','Home','Briefcase','Laptop','Gift','Smartphone','Plane','Shield','Monitor','Tag','Star','DollarSign','CreditCard','PiggyBank','Landmark','ArrowLeftRight','Wallet','Banknote'];
-const COLOR_OPTS = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#06b6d4','#f97316','#84cc16'];
+const COLOR_OPTS = ['#3b82f6','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#06b6d4','#f97316','#84cc16'];
 const TAB_LABELS = { expense: 'รายจ่าย', income: 'รายรับ', transfer: 'โอนเงิน' };
 const ORDER_KEY  = 'pm_cat_order'; // localStorage key
 
@@ -13,7 +13,7 @@ export default function CategoriesView({ onRefresh }) {
   const [catList, setCatList]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm]           = useState({ name: '', icon: 'Tag', color: '#6366f1' });
+  const [form, setForm]           = useState({ name: '', icon: 'Tag', color: '#3b82f6' });
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState('');
 
@@ -103,7 +103,7 @@ export default function CategoriesView({ onRefresh }) {
   // ── Modal ─────────────────────────────────────────────────────────────────
   const openModal = () => {
     setError('');
-    setForm({ name: '', icon: 'Tag', color: '#6366f1' });
+    setForm({ name: '', icon: 'Tag', color: '#3b82f6' });
     setShowModal(true);
   };
 
@@ -115,7 +115,7 @@ export default function CategoriesView({ onRefresh }) {
       await fetchCats();
       if (onRefresh) onRefresh();
       setShowModal(false);
-      setForm({ name: '', icon: 'Tag', color: '#6366f1' });
+      setForm({ name: '', icon: 'Tag', color: '#3b82f6' });
     } catch (err) { setError(err.message); }
     finally { setSaving(false); }
   };
@@ -151,7 +151,7 @@ export default function CategoriesView({ onRefresh }) {
           onDragLeave={handleDragLeave}
         >
           {displayed.map((c, idx) => {
-            const cardColor  = c.color || '#6366f1';
+            const cardColor  = c.color || '#3b82f6';
             const isDragging = dragIdx === idx;
             const isOver     = dragOverIdx === idx && dragIdx !== idx;
 
@@ -166,8 +166,8 @@ export default function CategoriesView({ onRefresh }) {
                 className={`bg-white rounded-2xl p-4 shadow-sm border flex flex-col items-center gap-2.5 relative group select-none transition-all
                   ${isDragging ? 'opacity-40 scale-95' : 'opacity-100'}
                   ${isOver
-                    ? 'border-indigo-400 shadow-md scale-105 bg-indigo-50'
-                    : 'border-slate-100 hover:border-indigo-200 card-hover'}
+                    ? 'border-blue-400 shadow-md scale-105 bg-blue-50'
+                    : 'border-slate-100 hover:border-blue-200 card-hover'}
                 `}
                 style={{ cursor: 'grab' }}
               >
@@ -198,7 +198,7 @@ export default function CategoriesView({ onRefresh }) {
 
           {/* ปุ่มเพิ่มใหม่ */}
           <div onClick={openModal}
-            className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2.5 cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 transition-all">
+            className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2.5 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100">
               <Icon name="Plus" size={22} color="#94a3b8" />
             </div>

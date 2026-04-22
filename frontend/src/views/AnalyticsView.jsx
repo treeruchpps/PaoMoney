@@ -9,11 +9,11 @@ const THAI_MONTHS  = [
   'มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน',
   'กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม',
 ];
-const PALETTE = ['#6366f1','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#f97316'];
+const PALETTE = ['#3b82f6','#10b981','#f59e0b','#3b82f6','#ef4444','#ec4899','#8b5cf6','#f97316'];
 
 const PERIOD_CONFIG = [
   { id: 'today', label: 'วันนี้',     icon: 'Sun',      color: '#f59e0b', bg: '#fffbeb', ring: '#fde68a' },
-  { id: 'week',  label: 'สัปดาห์นี้', icon: 'Calendar', color: '#6366f1', bg: '#eef2ff', ring: '#c7d2fe' },
+  { id: 'week',  label: 'สัปดาห์นี้', icon: 'Calendar', color: '#3b82f6', bg: '#eff6ff', ring: '#bfdbfe' },
   { id: 'month', label: 'เดือนนี้',   icon: 'BarChart2', color: '#10b981', bg: '#f0fdf4', ring: '#a7f3d0' },
   { id: 'year',  label: 'ปีนี้',      icon: 'TrendingUp', color: '#3b82f6', bg: '#eff6ff', ring: '#bfdbfe' },
 ];
@@ -280,8 +280,17 @@ export default function AnalyticsView({ accounts, categories }) {
     .map(([id, value]) => ({ label: getCatName(id === '__other__' ? null : id), value }))
     .sort((a, b) => b.value - a.value);
 
-  const top5 = [...txList.filter((t) => t.type === 'expense')]
-    .sort((a, b) => b.amount - a.amount)
+  const top5 = Object.entries(expByCat)
+    .map(([id, value]) => {
+      const cat = (categories || []).find((c) => c.id === id);
+      return {
+        id,
+        value,
+        catName: cat?.name || 'อื่นๆ',
+        catIcon: cat?.icon || 'Tag',
+      };
+    })
+    .sort((a, b) => b.value - a.value)
     .slice(0, 5);
 
   const prevExp   = barData.length >= 2 ? (barData[barData.length - 2]?.expense || 0) : 0;
@@ -298,13 +307,13 @@ export default function AnalyticsView({ accounts, categories }) {
           {
             label: 'มูลค่าสุทธิ',
             value: netWorth,
-            color: netWorth >= 0 ? '#6366f1' : '#ef4444',
-            bg:    netWorth >= 0 ? '#eef2ff' : '#fff1f2',
+            color: netWorth >= 0 ? '#3b82f6' : '#ef4444',
+            bg:    netWorth >= 0 ? '#eff6ff' : '#fff1f2',
           },
           { label: 'สินทรัพย์รวม', value: totalAssets, color: '#10b981', bg: '#f0fdf4' },
           { label: 'หนี้สินรวม',   value: totalLiab,   color: '#ef4444', bg: '#fff1f2' },
         ].map((s, i) => (
-          <div key={i} className="rounded-2xl p-4" style={{ background: s.bg }}>
+          <div key={i} className="rounded-2xl p-4 border" style={{ background: s.bg, borderColor: s.color + '40' }}>
             <p className="text-xs text-slate-500 mb-1">{s.label}</p>
             <p className="text-2xl font-bold" style={{ color: s.color }}>
               {s.value < 0 ? '-' : ''}฿{fmt(s.value)}
@@ -375,7 +384,7 @@ export default function AnalyticsView({ accounts, categories }) {
                   </div>
                   <div className="pt-1 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-xs text-slate-400">คงเหลือ</span>
-                    <span className={`text-xs font-bold ${stats.inc - stats.exp >= 0 ? 'text-indigo-500' : 'text-red-500'}`}>
+                    <span className={`text-xs font-bold ${stats.inc - stats.exp >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
                       {stats.inc - stats.exp < 0 ? '-' : ''}฿{fmt(stats.inc - stats.exp)}
                     </span>
                   </div>
@@ -471,22 +480,21 @@ export default function AnalyticsView({ accounts, categories }) {
                 {' · '}{periodDateLabel(period, weekStartDay)}
               </p>
               <div className="space-y-3">
-                {top5.map((tx, i) => {
-                  const pct = (tx.amount / top5[0].amount) * 100;
-                  const cat = (categories || []).find((c) => c.id === tx.category_id);
+                {top5.map((item, i) => {
+                  const pct = (item.value / top5[0].value) * 100;
                   return (
-                    <div key={tx.id} className="flex items-center gap-3">
+                    <div key={item.id} className="flex items-center gap-3">
                       <div className="w-6 text-center text-xs font-bold text-slate-400">#{i + 1}</div>
-                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-indigo-50">
-                        <Icon name={cat?.icon || 'Tag'} size={16} color="#6366f1" />
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-blue-50">
+                        <Icon name={item.catIcon} size={16} color="#3b82f6" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center mb-1">
-                          <p className="text-xs font-medium text-slate-700">{cat?.name || tx.note || '—'}</p>
-                          <p className="text-xs font-bold text-slate-800 ml-2">฿{fmt(tx.amount)}</p>
+                          <p className="text-xs font-medium text-slate-700">{item.catName}</p>
+                          <p className="text-xs font-bold text-slate-800 ml-2">฿{fmt(item.value)}</p>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#6366f1' }} />
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, background: '#3b82f6' }} />
                         </div>
                       </div>
                     </div>

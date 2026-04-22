@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Icon from '../components/common/Icon';
 import { useAuth } from '../contexts/AuthContext';
 import { profile as profileApi, auth as authApi } from '../services/api';
@@ -6,10 +6,14 @@ import { profile as profileApi, auth as authApi } from '../services/api';
 const WEEK_START_OPTS = [
   { value: 0, label: 'วันอาทิตย์' },
   { value: 1, label: 'วันจันทร์' },
+  { value: 2, label: 'วันอังคาร' },
+  { value: 3, label: 'วันพุธ' },
+  { value: 4, label: 'วันพฤหัสบดี' },
+  { value: 5, label: 'วันศุกร์' },
   { value: 6, label: 'วันเสาร์' },
 ];
 
-const accent = '#6366f1';
+const accent = '#3b82f6';
 
 export default function ProfileView() {
   const { user, logout } = useAuth();
@@ -19,10 +23,13 @@ export default function ProfileView() {
 
   // Profile form
   const [displayName,  setDisplayName]  = useState('');
-  const [weekStartDay, setWeekStartDay] = useState(1);
+  const [avatarUrl,    setAvatarUrl]    = useState('');
+  const [weekStartDay, setWeekStartDay] = useState(0);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg,   setProfileMsg]   = useState('');
   const [profileErr,   setProfileErr]   = useState('');
+
+  const fileInputRef = useRef(null);
 
   // Password form
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
@@ -38,6 +45,7 @@ export default function ProfileView() {
         const data = await profileApi.get();
         setProfileData(data);
         setDisplayName(data.display_name || '');
+        setAvatarUrl(data.avatar_url || '');
         setWeekStartDay(data.week_start_day ?? 1);
       } catch {}
       finally { setLoadingProfile(false); }
@@ -45,6 +53,17 @@ export default function ProfileView() {
   }, []);
 
   const initials = (user?.username || '?').slice(0, 2).toUpperCase();
+
+  // Handle avatar file pick → convert to base64 data URL
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setProfileErr('กรุณาเลือกไฟล์รูปภาพ'); return; }
+    if (file.size > 2 * 1024 * 1024) { setProfileErr('ขนาดไฟล์ต้องไม่เกิน 2MB'); return; }
+    const reader = new FileReader();
+    reader.onload = (ev) => setAvatarUrl(ev.target.result);
+    reader.readAsDataURL(file);
+  };
 
   // Save profile
   const saveProfile = async () => {
@@ -54,9 +73,11 @@ export default function ProfileView() {
     try {
       const updated = await profileApi.update({
         display_name:   displayName || null,
+        avatar_url:     avatarUrl   || null,
         week_start_day: weekStartDay,
       });
       setProfileData(updated);
+      setAvatarUrl(updated.avatar_url || '');
       setProfileMsg('บันทึกข้อมูลสำเร็จ');
     } catch (err) {
       setProfileErr(err.message);
@@ -87,7 +108,7 @@ export default function ProfileView() {
   if (loadingProfile) {
     return (
       <div className="p-6 flex items-center justify-center py-32">
-        <div className="w-8 h-8 rounded-full border-4 border-indigo-200 border-t-indigo-600 animate-spin" />
+        <div className="w-8 h-8 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin" />
       </div>
     );
   }
@@ -97,18 +118,49 @@ export default function ProfileView() {
 
       {/* ── Avatar + ชื่อ ──────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 flex items-center gap-5">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold flex-shrink-0"
-          style={{ background: accent }}>
-          {initials}
+        {/* Avatar — คลิกเพื่อเปลี่ยนรูป */}
+        <div className="relative flex-shrink-0 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt="avatar"
+              className="w-20 h-20 rounded-full object-cover border-2 border-blue-100"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-white text-2xl font-bold"
+              style={{ background: accent }}>
+              {initials}
+            </div>
+          )}
+          {/* Overlay */}
+          <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <Icon name="Camera" size={22} color="white" />
+          </div>
+          {/* Remove button */}
+          {avatarUrl && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setAvatarUrl(''); }}
+              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shadow"
+            >
+              <Icon name="X" size={10} color="white" />
+            </button>
+          )}
         </div>
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleAvatarChange}
+        />
         <div className="min-w-0">
           <p className="text-xl font-bold text-slate-800 truncate">
             {profileData?.display_name || user?.username}
           </p>
           <p className="text-sm text-slate-400 mt-0.5">{user?.email}</p>
-          <p className="text-xs text-slate-400 mt-1">
-            @{user?.username}
-          </p>
+          <p className="text-xs text-slate-400 mt-1">@{user?.username}</p>
+          <p className="text-xs text-slate-300 mt-1">คลิกที่รูปเพื่อเปลี่ยนโปรไฟล์</p>
         </div>
       </div>
 
@@ -145,20 +197,14 @@ export default function ProfileView() {
 
         <div>
           <label className="text-xs font-medium text-slate-500 mb-1 block">วันเริ่มต้นสัปดาห์</label>
-          <div className="flex gap-2">
+          <select
+            value={weekStartDay}
+            onChange={(e) => setWeekStartDay(parseInt(e.target.value))}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
             {WEEK_START_OPTS.map((opt) => (
-              <button key={opt.value}
-                onClick={() => setWeekStartDay(opt.value)}
-                className="flex-1 py-2.5 rounded-xl text-sm font-medium border-2 transition-all"
-                style={{
-                  borderColor:  weekStartDay === opt.value ? accent : '#e2e8f0',
-                  background:   weekStartDay === opt.value ? accent + '15' : '#f8fafc',
-                  color:        weekStartDay === opt.value ? accent : '#64748b',
-                }}>
-                {opt.label}
-              </button>
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
             ))}
-          </div>
+          </select>
         </div>
 
         {profileMsg && <p className="text-sm text-emerald-600 bg-emerald-50 px-3 py-2 rounded-xl">{profileMsg}</p>}

@@ -7,7 +7,7 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
   const totalAssets = accounts.filter((a) => a.type === 'asset').reduce((s, a) => s + a.balance, 0);
   const totalLiab   = accounts.filter((a) => a.type === 'liability').reduce((s, a) => s + a.balance, 0);
   const netWorth    = totalAssets - totalLiab;
-  const accent = '#6366f1';
+  const accent = '#3b82f6';
   const initials = user?.username?.slice(0, 1).toUpperCase() || '?';
 
   return (
@@ -16,10 +16,15 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
     >
       {/* Logo */}
       <div className="px-4 py-5 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: accent }}>
-          <Icon name="DollarSign" size={18} color="white" />
-        </div>
-        {!collapsed && <span className="text-base font-bold" style={{ color: accent }}>PaoMoney</span>}
+        <button
+          onClick={() => setView('analytics')}
+          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+        >
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: accent }}>
+            <Icon name="DollarSign" size={18} color="white" />
+          </div>
+          {!collapsed && <span className="text-base font-bold" style={{ color: accent }}>PaoMoney</span>}
+        </button>
       </div>
 
       {/* User info */}

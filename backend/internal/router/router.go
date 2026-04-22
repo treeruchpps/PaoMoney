@@ -32,6 +32,8 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	txH      := handlers.NewTransactionHandler(db)
 	goalH    := handlers.NewSavingsGoalHandler(db)
 	budgetH  := handlers.NewBudgetHandler(db)
+	recurH   := handlers.NewRecurringHandler(db)
+	notiH    := handlers.NewNotificationHandler(db)
 
 	v1 := r.Group("/api/v1")
 
@@ -86,6 +88,18 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		protected.GET("/budgets/:id", budgetH.Get)
 		protected.PUT("/budgets/:id", budgetH.Update)
 		protected.DELETE("/budgets/:id", budgetH.Delete)
+
+		// Recurring Transactions
+		protected.GET("/recurring",     recurH.List)
+		protected.POST("/recurring",    recurH.Create)
+		protected.PUT("/recurring/:id", recurH.Update)
+		protected.DELETE("/recurring/:id", recurH.Delete)
+
+		// Notifications
+		protected.GET("/notifications",              notiH.List)
+		protected.POST("/notifications/:id/confirm", notiH.Confirm)
+		protected.POST("/notifications/:id/skip",    notiH.Skip)
+		protected.PUT("/notifications/read-all",     notiH.ReadAll)
 	}
 
 	return r

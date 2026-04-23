@@ -19,8 +19,9 @@ export const clearTokens = () => {
 };
 
 // ---------- Core fetch wrapper ----------
-async function request(path, options = {}, retry = true) {
-  const headers = { 'Content-Type': 'application/json', ...options.headers };
+// isFormData = true → ไม่ set Content-Type ให้ browser จัดการ multipart boundary เอง
+async function request(path, options = {}, retry = true, isFormData = false) {
+  const headers = isFormData ? {} : { 'Content-Type': 'application/json', ...options.headers };
   const token = getAccessToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
@@ -161,6 +162,18 @@ export const recurring = {
   create: (body)     => request('/recurring',     { method: 'POST',   body: JSON.stringify(body) }),
   update: (id, body) => request(`/recurring/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   delete: (id)       => request(`/recurring/${id}`, { method: 'DELETE' }),
+};
+
+// ====================================================
+// OCR
+// ====================================================
+export const ocr = {
+  // type: 'receipt' | 'bank_slip'
+  scan: (file, type) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request(`/ocr?type=${type}`, { method: 'POST', body: form }, true, true);
+  },
 };
 
 // ====================================================

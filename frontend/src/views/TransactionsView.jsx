@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ArrowUp, ArrowDown, ArrowLeftRight, Trash2, Edit, Search, X, Download, List, Calendar } from 'lucide-react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ArrowUp, ArrowDown, ArrowLeftRight, Trash2, Edit, Search, X, Download, List, Calendar, ScanLine, Loader2 } from 'lucide-react';
 import Icon from '../components/common/Icon';
 import Modal from '../components/common/Modal';
-import { transactions as txApi, accounts as accountsApi } from '../services/api';
+import { transactions as txApi, accounts as accountsApi, ocr as ocrApi } from '../services/api';
 import { fmt } from '../constants/data';
 
 const TYPE_LABEL = { income: 'รายรับ', expense: 'รายจ่าย', transfer: 'โอนเงิน', adjustment: 'ปรับยอด' };
@@ -208,6 +208,137 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
   const [editId, setEditId] = useState(null); // null = create, uuid = edit
+
+  // ── OCR ───────────────────────────────────────────────────────────────────
+  const ocrFileRef      = useRef(null);
+  const [ocrModal,      setOcrModal]     = useState(null);    // null | 'receipt' | 'bank_slip'
+  const [ocrStep,       setOcrStep]      = useState('upload'); // 'upload' | 'result'
+  const [ocrFile,       setOcrFile]      = useState(null);
+  const [ocrLoading,    setOcrLoading]   = useState(false);
+  const [ocrError,      setOcrError]     = useState('');
+  const [ocrData,       setOcrData]      = useState(null);
+  const [ocrPreview,    setOcrPreview]   = useState('');
+  // receipt
+  const [ocrItems,      setOcrItems]     = useState([]);  // [{ name, quantity, unit_price, note, category_id, include }]
+  const [ocrAccount,    setOcrAccount]   = useState('');
+  const [ocrDate,       setOcrDate]      = useState(today);
+  const [ocrNote,       setOcrNote]      = useState('');
+  // bank_slip
+  const [ocrTxType,     setOcrTxType]    = useState('expense');
+  const [ocrAmount,     setOcrAmount]    = useState('');
+  const [ocrName,       setOcrName]      = useState('');
+  const [ocrSlipNote,   setOcrSlipNote]  = useState('');
+  const [ocrSlipCat,    setOcrSlipCat]   = useState('');
+  const [ocrToAccount,  setOcrToAccount] = useState('');
+  const [ocrSaving,     setOcrSaving]    = useState(false);
+
+  const openOcrModal = (type) => {
+    setOcrModal(type); setOcrStep('upload'); setOcrFile(null);
+    setOcrPreview(''); setOcrError(''); setOcrData(null);
+    setOcrNote(''); setOcrSlipNote(''); setOcrSlipCat('');
+  };
+
+  const closeOcr = () => {
+    setOcrModal(null); setOcrStep('upload'); setOcrFile(null);
+    setOcrData(null); setOcrPreview(''); setOcrError('');
+    setOcrItems([]); setOcrLoading(false);
+  };
+
+  const handleOcrFileSelect = (file) => {
+    if (!file) return;
+    setOcrFile(file);
+    setOcrError('');
+    const reader = new FileReader();
+    reader.onload = (e) => setOcrPreview(e.target.result);
+    reader.readAsDataURL(file);
+  };
+
+  const runOcr = async () => {
+    if (!ocrFile) return;
+    setOcrLoading(true); setOcrError('');
+    try {
+      const res = await ocrApi.scan(ocrFile, ocrModal);
+      setOcrData(res.data);
+      setOcrDate(res.data?.date || today);
+      if (ocrModal === 'receipt') {
+        setOcrAccount(accounts[0]?.id || '');
+        setOcrItems((res.data?.items || []).map((it) => ({
+          name:        it.name || '',
+          quantity:    it.quantity || 1,
+          unit_price:  it.unit_price || 0,
+          note:        '',
+          category_id: (categories || []).filter((c) => c.type === 'expense')[0]?.id || '',
+          include:     true,
+        })));
+      } else {
+        const d = res.data || {};
+        setOcrTxType('expense');
+        setOcrAmount(d.amount != null ? String(d.amount) : '');
+        setOcrName(d.sender?.name ? `โอนจาก ${d.sender.name}` : d.receiver?.name ? `โอนให้ ${d.receiver.name}` : '');
+        setOcrAccount(accounts[0]?.id || '');
+        setOcrToAccount(accounts[1]?.id || accounts[0]?.id || '');
+        setOcrSlipCat((categories || []).filter((c) => c.type === 'expense')[0]?.id || '');
+      }
+      setOcrStep('result');
+    } catch (err) {
+      setOcrError(err.message || 'OCR ล้มเหลว');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const saveOcrReceipt = async () => {
+    const selected = ocrItems.filter((it) => it.include && it.unit_price > 0);
+    if (selected.length === 0) { setOcrError('เลือกรายการอย่างน้อย 1 อัน'); return; }
+    setOcrSaving(true); setOcrError('');
+    try {
+      await Promise.all(selected.map((it) =>
+        txApi.create({
+          type:             'expense',
+          amount:           parseFloat(it.unit_price) * (parseFloat(it.quantity) || 1),
+          name:             it.name || null,
+          note:             it.note || ocrNote || null,
+          category_id:      it.category_id || null,
+          account_id:       ocrAccount,
+          transaction_date: ocrDate,
+        })
+      ));
+      await Promise.all([fetchTx(), onRefreshAccounts?.()]);
+      closeOcr();
+    } catch (err) {
+      setOcrError(err.message);
+    } finally {
+      setOcrSaving(false);
+    }
+  };
+
+  const saveOcrSlip = async () => {
+    if (!ocrAmount || parseFloat(ocrAmount) <= 0) { setOcrError('กรุณาใส่จำนวนเงิน'); return; }
+    setOcrSaving(true); setOcrError('');
+    try {
+      const body = {
+        type:             ocrTxType,
+        amount:           parseFloat(ocrAmount),
+        name:             ocrName || null,
+        note:             ocrSlipNote || null,
+        transaction_date: ocrDate,
+      };
+      if (ocrTxType === 'transfer') {
+        body.account_id    = ocrAccount;
+        body.to_account_id = ocrToAccount;
+      } else {
+        body.account_id  = ocrAccount;
+        body.category_id = ocrSlipCat || null;
+      }
+      await txApi.create(body);
+      await Promise.all([fetchTx(), onRefreshAccounts?.()]);
+      closeOcr();
+    } catch (err) {
+      setOcrError(err.message);
+    } finally {
+      setOcrSaving(false);
+    }
+  };
 
   // ── Adjust-balance modal (for adjustment-type tx) ─────────────────────────
   const [showAdjustModal, setShowAdjustModal] = useState(false);
@@ -508,6 +639,21 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
             <Download size={13} color="#64748b" />
             Export CSV
           </button>
+
+          {/* OCR ปุ่มแยก 2 ปุ่ม */}
+          <input ref={ocrFileRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleOcrFileSelect(f); }} />
+
+          <button onClick={() => openOcrModal('receipt')}
+            className="text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 border border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100 transition-colors">
+            <ScanLine size={13} />
+            สแกนใบเสร็จ
+          </button>
+          <button onClick={() => openOcrModal('bank_slip')}
+            className="text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 border border-sky-200 bg-sky-50 text-sky-600 hover:bg-sky-100 transition-colors">
+            <ScanLine size={13} />
+            สแกนสลิป
+          </button>
         </div>
       </div>
 
@@ -800,6 +946,293 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
                 {adjustSaving ? 'กำลังบันทึก...' : 'บันทึก'}
               </button>
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: OCR ใบเสร็จ ───────────────────────────────────────────────── */}
+      {ocrModal === 'receipt' && (
+        <Modal title="สแกนใบเสร็จ" onClose={closeOcr}>
+          <div className="space-y-4">
+            {ocrError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{ocrError}</p>}
+
+            {/* ─── Step: upload ─── */}
+            {ocrStep === 'upload' && (
+              <>
+                <div
+                  onDoubleClick={() => ocrFileRef.current?.click()}
+                  className="relative border-2 border-dashed border-violet-200 rounded-2xl overflow-hidden cursor-pointer hover:border-violet-400 transition-colors"
+                  style={{ minHeight: 180 }}
+                >
+                  {ocrPreview ? (
+                    <img src={ocrPreview} alt="preview" className="w-full object-contain max-h-52" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-2 py-12 text-violet-300">
+                      <ScanLine size={36} />
+                      <p className="text-sm font-medium text-violet-400">ดับเบิลคลิกเพื่อเลือกรูปภาพ</p>
+                      <p className="text-xs text-slate-400">รองรับ JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-xl border border-amber-100">
+                  รองรับเฉพาะรายจ่ายเท่านั้น
+                </p>
+
+                <div className="flex gap-3">
+                  <button onClick={closeOcr}
+                    className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
+                    ยกเลิก
+                  </button>
+                  <button onClick={runOcr} disabled={!ocrFile || ocrLoading}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: '#7c3aed' }}>
+                    {ocrLoading ? <><Loader2 size={15} className="animate-spin" /> กำลังอ่าน...</> : 'สแกน'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ─── Step: result ─── */}
+            {ocrStep === 'result' && ocrData && (
+              <>
+                {/* Preview รูปค้างไว้เทียบ */}
+                {ocrPreview && (
+                  <img src={ocrPreview} alt="receipt preview"
+                    className="w-full object-contain max-h-40 rounded-xl border border-slate-100 bg-slate-50" />
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">วันที่</label>
+                    <input type="date" value={ocrDate} onChange={(e) => setOcrDate(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">บัญชี</label>
+                    <select value={ocrAccount} onChange={(e) => setOcrAccount(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50">
+                      {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                {/* รายการสินค้า */}
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-2 block">รายการสินค้า</label>
+                  <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                    {ocrItems.map((it, i) => (
+                      <div key={i} className={`p-3 rounded-xl border transition-colors ${it.include ? 'border-violet-200 bg-violet-50/40' : 'border-slate-100 bg-slate-50 opacity-50'}`}>
+                        {/* ชื่อ + ยอดรวม */}
+                        <div className="flex items-center gap-2 mb-2">
+                          <input type="checkbox" checked={it.include}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, include: e.target.checked } : x))}
+                            className="accent-violet-500 flex-shrink-0" />
+                          <input value={it.name}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, name: e.target.value } : x))}
+                            className="flex-1 text-sm font-medium bg-transparent border-b border-slate-200 focus:outline-none focus:border-violet-400 text-slate-700" />
+                          <span className="text-sm font-bold text-red-500 whitespace-nowrap flex-shrink-0">
+                            ฿{fmt(parseFloat(it.unit_price || 0) * parseFloat(it.quantity || 1))}
+                          </span>
+                        </div>
+                        {/* จำนวน × ราคา */}
+                        <div className="ml-6 flex items-center gap-2 mb-2">
+                          <span className="text-xs text-slate-400">จำนวน</span>
+                          <input type="number" min="0" value={it.quantity}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, quantity: e.target.value } : x))}
+                            className="w-16 border border-slate-200 rounded-lg px-2 py-1 text-xs text-center bg-white" />
+                          <span className="text-xs text-slate-400">× ราคา</span>
+                          <input type="number" min="0" value={it.unit_price}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, unit_price: e.target.value } : x))}
+                            className="flex-1 border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white" />
+                          <span className="text-xs text-slate-400">฿</span>
+                        </div>
+                        {/* หมวดหมู่ */}
+                        <div className="ml-6 mb-2">
+                          <select value={it.category_id}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, category_id: e.target.value } : x))}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white text-slate-600">
+                            <option value="">— ไม่ระบุหมวดหมู่ —</option>
+                            {(categories || []).filter((c) => c.type === 'expense').map((c) => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        {/* หมายเหตุรายการนี้ */}
+                        <div className="ml-6">
+                          <input value={it.note}
+                            onChange={(e) => setOcrItems((prev) => prev.map((x, j) => j === i ? { ...x, note: e.target.value } : x))}
+                            placeholder="หมายเหตุรายการนี้..."
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs bg-white text-slate-600 placeholder-slate-300" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={closeOcr}
+                    className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
+                    ยกเลิก
+                  </button>
+                  <button onClick={saveOcrReceipt} disabled={ocrSaving}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ background: '#7c3aed' }}>
+                    {ocrSaving ? 'กำลังบันทึก...' : `บันทึก ${ocrItems.filter((x) => x.include).length} รายการ`}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {/* ── Modal: OCR สลิป ──────────────────────────────────────────────────── */}
+      {ocrModal === 'bank_slip' && (
+        <Modal title="สแกนสลิป" onClose={closeOcr}>
+          <div className="space-y-4">
+            {ocrError && <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{ocrError}</p>}
+
+            {/* ─── Step: upload ─── */}
+            {ocrStep === 'upload' && (
+              <>
+                <div
+                  onDoubleClick={() => ocrFileRef.current?.click()}
+                  className="relative border-2 border-dashed border-sky-200 rounded-2xl overflow-hidden cursor-pointer hover:border-sky-400 transition-colors"
+                  style={{ minHeight: 180 }}
+                >
+                  {ocrPreview ? (
+                    <img src={ocrPreview} alt="preview" className="w-full object-contain max-h-52" />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-2 py-12 text-sky-300">
+                      <ScanLine size={36} />
+                      <p className="text-sm font-medium text-sky-400">ดับเบิลคลิกเพื่อเลือกรูปภาพ</p>
+                      <p className="text-xs text-slate-400">รองรับ JPG, PNG</p>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-xl border border-amber-100">
+                  รองรับรายจ่ายและการโอนเงิน
+                </p>
+
+                <div className="flex gap-3">
+                  <button onClick={closeOcr}
+                    className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
+                    ยกเลิก
+                  </button>
+                  <button onClick={runOcr} disabled={!ocrFile || ocrLoading}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-50 flex items-center justify-center gap-2"
+                    style={{ background: '#0284c7' }}>
+                    {ocrLoading ? <><Loader2 size={15} className="animate-spin" /> กำลังอ่าน...</> : 'สแกน'}
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* ─── Step: result ─── */}
+            {ocrStep === 'result' && ocrData && (
+              <>
+                {/* Preview รูปค้างไว้เทียบ */}
+                {ocrPreview && (
+                  <img src={ocrPreview} alt="slip preview"
+                    className="w-full object-contain max-h-40 rounded-xl border border-slate-100 bg-slate-50" />
+                )}
+
+                {/* เลือกประเภท */}
+                <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                  {[
+                    { val: 'expense',  label: 'รายจ่าย',  color: '#ef4444' },
+                    { val: 'transfer', label: 'โอนเงิน',  color: '#3b82f6' },
+                  ].map((opt) => (
+                    <button key={opt.val} onClick={() => setOcrTxType(opt.val)}
+                      className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${ocrTxType === opt.val ? 'bg-white shadow-sm' : 'text-slate-400'}`}
+                      style={ocrTxType === opt.val ? { color: opt.color } : {}}>
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">วันที่</label>
+                  <input type="date" value={ocrDate} onChange={(e) => setOcrDate(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">ชื่อรายการ</label>
+                  <input value={ocrName} onChange={(e) => setOcrName(e.target.value)}
+                    placeholder="เช่น โอนให้ร้านค้า"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50" />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">จำนวนเงิน (฿)</label>
+                  <input type="number" value={ocrAmount} onChange={(e) => setOcrAmount(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-lg font-bold bg-slate-50" />
+                </div>
+
+                {/* หมวดหมู่ — เฉพาะ expense */}
+                {ocrTxType === 'expense' && (
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">หมวดหมู่</label>
+                    <select value={ocrSlipCat} onChange={(e) => setOcrSlipCat(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50">
+                      <option value="">— ไม่ระบุหมวดหมู่ —</option>
+                      {(categories || []).filter((c) => c.type === 'expense').map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* หมายเหตุ */}
+                <div>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">หมายเหตุ</label>
+                  <input value={ocrSlipNote} onChange={(e) => setOcrSlipNote(e.target.value)}
+                    placeholder="บันทึกข้อมูลเพิ่มเติม..."
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50 text-slate-700 placeholder-slate-300" />
+                </div>
+
+                {/* บัญชี */}
+                {ocrTxType === 'transfer' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 mb-1 block">จากบัญชี</label>
+                      <select value={ocrAccount} onChange={(e) => setOcrAccount(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50">
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-slate-500 mb-1 block">ไปยังบัญชี</label>
+                      <select value={ocrToAccount} onChange={(e) => setOcrToAccount(e.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50">
+                        {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-medium text-slate-500 mb-1 block">บัญชี</label>
+                    <select value={ocrAccount} onChange={(e) => setOcrAccount(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-slate-50">
+                      {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button onClick={closeOcr}
+                    className="flex-1 border border-slate-200 text-slate-600 py-2.5 rounded-xl text-sm font-medium hover:bg-slate-50">
+                    ยกเลิก
+                  </button>
+                  <button onClick={saveOcrSlip} disabled={ocrSaving}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-60"
+                    style={{ background: '#0284c7' }}>
+                    {ocrSaving ? 'กำลังบันทึก...' : 'บันทึกรายการ'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </Modal>
       )}

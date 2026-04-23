@@ -30,7 +30,7 @@ type CreateBudgetRequest struct {
 	Name       string       `json:"name"       binding:"required,max=100"`
 	Amount     float64      `json:"amount"     binding:"required,gt=0"`
 	Period     BudgetPeriod `json:"period"     binding:"required,oneof=weekly monthly yearly"`
-	StartDate  string       `json:"start_date" binding:"required"`
+	StartDate  string       `json:"start_date"`
 	EndDate    *string      `json:"end_date"`
 }
 

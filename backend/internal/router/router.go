@@ -34,6 +34,7 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 	budgetH  := handlers.NewBudgetHandler(db)
 	recurH   := handlers.NewRecurringHandler(db)
 	notiH    := handlers.NewNotificationHandler(db)
+	ocrH     := handlers.NewOCRHandler()
 
 	v1 := r.Group("/api/v1")
 
@@ -100,6 +101,9 @@ func Setup(db *pgxpool.Pool, cfg *config.Config) *gin.Engine {
 		protected.POST("/notifications/:id/confirm", notiH.Confirm)
 		protected.POST("/notifications/:id/skip",    notiH.Skip)
 		protected.PUT("/notifications/read-all",     notiH.ReadAll)
+
+		// OCR
+		protected.POST("/ocr", ocrH.Scan)
 	}
 
 	return r

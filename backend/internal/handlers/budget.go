@@ -80,16 +80,22 @@ func (h *BudgetHandler) Create(c *gin.Context) {
 		return
 	}
 
-	startDate, err := time.Parse("2006-01-02", req.StartDate)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, use YYYY-MM-DD"})
-		return
+	var startDate time.Time
+	if req.StartDate == "" {
+		startDate = time.Now().Truncate(24 * time.Hour)
+	} else {
+		parsed, parseErr := time.Parse("2006-01-02", req.StartDate)
+		if parseErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid start_date format, use YYYY-MM-DD"})
+			return
+		}
+		startDate = parsed
 	}
 
 	var endDate *time.Time
 	if req.EndDate != nil {
-		parsed, err := time.Parse("2006-01-02", *req.EndDate)
-		if err != nil {
+		parsed, parseErr := time.Parse("2006-01-02", *req.EndDate)
+		if parseErr != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid end_date format, use YYYY-MM-DD"})
 			return
 		}
@@ -97,7 +103,7 @@ func (h *BudgetHandler) Create(c *gin.Context) {
 	}
 
 	var b models.Budget
-	err = h.db.QueryRow(context.Background(),
+	err := h.db.QueryRow(context.Background(),
 		`INSERT INTO budgets (user_id, category_id, name, amount, period, start_date, end_date)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id, user_id, category_id, name, amount, period, start_date, end_date, is_active, created_at, updated_at`,

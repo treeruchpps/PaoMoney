@@ -134,7 +134,7 @@ export default function AccountsView({ accounts, onRefresh }) {
     } catch (err) { alert(err.message); }
   };
 
-  // ── Distribute (โยนเงินเข้ากระเป๋า) ──────────────────────────────────────
+  // ── Distribute ──────────────────────────────────────
   const openDist = () => {
     setPoolAmount('');
     setDistDate(todayStr());
@@ -264,7 +264,7 @@ export default function AccountsView({ accounts, onRefresh }) {
               className="text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium border-2 transition-colors"
               style={{ color: '#3b82f6', borderColor: '#bfdbfe', background: '#eff6ff' }}>
               <Share2 size={15} color="#3b82f6" />
-              แบ่งเงินเข้ากระเป๋า
+              แบ่งเงินเข้าบัญชี
             </button>
           )}
           <button onClick={openAdd}
@@ -390,10 +390,10 @@ export default function AccountsView({ accounts, onRefresh }) {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          Modal: โยนเงินเข้ากระเป๋า
+          Modal: แบ่งเงินเข้าบัญชี
       ══════════════════════════════════════════════════════════════════════════ */}
       {showDist && (
-        <Modal title="โยนเงินเข้ากระเป๋า" onClose={() => setShowDist(false)}>
+        <Modal title="แบ่งเงินเข้าบัญชี" onClose={() => setShowDist(false)}>
           <div className="space-y-4">
             {distError && (
               <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-xl">{distError}</p>

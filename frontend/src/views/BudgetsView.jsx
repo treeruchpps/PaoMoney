@@ -16,11 +16,24 @@ const PERIOD_ORDER = ['weekly', 'monthly', 'yearly'];
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
-const todayDate   = new Date();
-const Y = todayDate.getFullYear();
-const M = todayDate.getMonth() + 1;
-const daysInMonth = new Date(Y, M, 0).getDate();
-const daysLeft    = daysInMonth - todayDate.getDate();
+// วันที่เหลือใน period ปัจจุบัน
+function getDaysLeft(period) {
+  const now = new Date();
+  const dow = now.getDay();
+  if (period === 'weekly') {
+    return dow === 0 ? 0 : 7 - dow;
+  }
+  if (period === 'monthly') {
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    return lastDay - now.getDate();
+  }
+  if (period === 'yearly') {
+    const endYear     = new Date(now.getFullYear(), 11, 31);
+    const startToday  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((endYear - startToday) / (1000 * 60 * 60 * 24));
+  }
+  return 0;
+}
 
 // ช่วงวันของแต่ละ period
 function getPeriodRange(period) {
@@ -54,7 +67,6 @@ function getPeriodRange(period) {
 
 const EMPTY_FORM = {
   name: '', category_id: '', amount: '', period: 'monthly',
-  start_date: todayDate.toISOString().slice(0, 10),
 };
 
 export default function BudgetsView({ categories }) {
@@ -130,7 +142,6 @@ export default function BudgetsView({ categories }) {
       category_id: b.category_id || '',
       amount:      String(b.amount),
       period:      b.period,
-      start_date:  b.start_date?.slice(0, 10) || todayDate.toISOString().slice(0, 10),
     });
     setError('');
     setShowModal(true);
@@ -166,15 +177,15 @@ export default function BudgetsView({ categories }) {
   const totalLimit = budgetList.reduce((s, b) => s + b.amount, 0);
   const totalSpent = budgetList.reduce((s, b) => s + getSpent(b), 0);
   const totalPct   = totalLimit > 0 ? Math.min(100, Math.round((totalSpent / totalLimit) * 100)) : 0;
-  const dailyLeft  = daysLeft > 0 ? Math.max(0, (totalLimit - totalSpent) / daysLeft) : 0;
 
   return (
     <div className="p-6 space-y-5">
 
       {/* ── Summary ────────────────────────────────────────────────────────── */}
       {!loading && budgetList.length > 0 && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2 bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
+        <div className="space-y-4">
+          {/* Overall */}
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
             <div className="flex justify-between items-start mb-3">
               <div>
                 <p className="text-xs text-slate-500">งบประมาณรวม</p>
@@ -194,12 +205,37 @@ export default function BudgetsView({ categories }) {
             </div>
             <p className="text-xs text-slate-400 mt-1.5">คงเหลือ ฿{fmt(Math.max(0, totalLimit - totalSpent))}</p>
           </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white flex flex-col justify-between">
-            <p className="text-blue-100 text-xs font-medium">งบรายวันที่เหลือ</p>
-            <div>
-              <p className="text-3xl font-bold mt-1">฿{Math.round(dailyLeft).toLocaleString()}</p>
-              <p className="text-blue-200 text-xs mt-1">เหลืออีก {daysLeft} วัน</p>
-            </div>
+
+          {/* Per-period daily budget cards */}
+          <div className="grid grid-cols-3 gap-4">
+            {PERIOD_ORDER.map((period) => {
+              const group = budgetList.filter((b) => b.period === period);
+              if (group.length === 0) return null;
+              const pc           = PERIOD_CONFIG[period];
+              const PeriodIcon   = pc.icon;
+              const periodLimit  = group.reduce((s, b) => s + b.amount, 0);
+              const periodSpent  = group.reduce((s, b) => s + getSpent(b), 0);
+              const remaining    = Math.max(0, periodLimit - periodSpent);
+              const daysLeft     = getDaysLeft(period);
+              const dailyLeft    = daysLeft > 0 ? remaining / daysLeft : remaining;
+              const pct          = periodLimit > 0 ? Math.min(100, Math.round((periodSpent / periodLimit) * 100)) : 0;
+              return (
+                <div key={period} className="rounded-2xl p-5 text-white flex flex-col justify-between"
+                  style={{ background: `linear-gradient(135deg, ${pc.color}ee, ${pc.color}bb)` }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <PeriodIcon size={14} color="white" style={{ opacity: 0.85 }} />
+                    <p className="text-white/80 text-xs font-medium">{pc.label}</p>
+                  </div>
+                  <div>
+                    <p className="text-3xl font-bold">฿{fmt(dailyLeft)}</p>
+                    <p className="text-white/70 text-xs mt-1">งบรายวันที่เหลือ</p>
+                    <p className="text-white/60 text-xs mt-0.5">
+                      เหลืออีก {daysLeft} วัน · ใช้ไป {pct}%
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -340,15 +376,6 @@ export default function BudgetsView({ categories }) {
                 </select>
               </div>
             </div>
-
-            {!editId && (
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">วันเริ่มต้น</label>
-                <input type="date" value={form.start_date}
-                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
-              </div>
-            )}
 
             <div className="flex gap-3 pt-2">
               <button onClick={() => setShowModal(false)}

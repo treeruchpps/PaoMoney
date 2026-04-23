@@ -122,7 +122,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
   };
 
   const remove = async (id) => {
-    if (!window.confirm('ต้องการลบรายการประจำนี้?')) return;
+    if (!window.confirm('ต้องการลบรายการทำซ้ำนี้?')) return;
     try {
       await recurApi.delete(id);
       await fetchList();
@@ -232,7 +232,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-base font-semibold text-slate-700">รายการประจำ</h2>
+          <h2 className="text-base font-semibold text-slate-700">รายการทำซ้ำ</h2>
           <p className="text-xs text-slate-400 mt-0.5">
             รายการที่เกิดซ้ำอัตโนมัติ — กดยืนยันในแจ้งเตือนเมื่อครบกำหนด
           </p>
@@ -249,7 +249,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
       ) : list.length === 0 ? (
         <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
           <RefreshCw size={40} color="#cbd5e1" />
-          <p className="text-sm">ยังไม่มีรายการประจำ กดเพิ่มด้านบน</p>
+          <p className="text-sm">ยังไม่มีรายการทำซ้ำ กดเพิ่มด้านบน</p>
         </div>
       ) : (
         <div className="space-y-6">

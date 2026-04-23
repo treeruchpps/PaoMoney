@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import Icon from '../components/common/Icon';
+import { ArrowUp, ArrowDown, ArrowLeftRight, Sun, CalendarDays, Calendar as CalendarIcon, Star, Clock, Pencil, Trash2, Plus, RefreshCw } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { recurring as recurApi } from '../services/api';
 import { fmt } from '../constants/data';
@@ -147,7 +147,9 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
           <div className="flex items-center gap-3 flex-1 min-w-0">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
               style={{ background: TYPE_BG[r.type] }}>
-              <Icon name={TYPE_ICON[r.type]} size={20} color={TYPE_COLOR[r.type]} />
+              {TYPE_ICON[r.type] === 'ArrowUp' && <ArrowUp size={20} color={TYPE_COLOR[r.type]} />}
+              {TYPE_ICON[r.type] === 'ArrowDown' && <ArrowDown size={20} color={TYPE_COLOR[r.type]} />}
+              {TYPE_ICON[r.type] === 'ArrowLeftRight' && <ArrowLeftRight size={20} color={TYPE_COLOR[r.type]} />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-slate-800 truncate">{r.name || '(ไม่มีชื่อ)'}</p>
@@ -181,7 +183,10 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
           <div className="flex items-center gap-3">
             {/* Frequency */}
             <div className="flex items-center gap-1.5">
-              <Icon name={FREQ_ICON[r.frequency]} size={13} color="#94a3b8" />
+              {FREQ_ICON[r.frequency] === 'Sun' && <Sun size={13} color="#94a3b8" />}
+              {FREQ_ICON[r.frequency] === 'CalendarDays' && <CalendarDays size={13} color="#94a3b8" />}
+              {FREQ_ICON[r.frequency] === 'Calendar' && <CalendarIcon size={13} color="#94a3b8" />}
+              {FREQ_ICON[r.frequency] === 'Star' && <Star size={13} color="#94a3b8" />}
               <span className="text-xs text-slate-500">{FREQ_LABEL[r.frequency]}</span>
             </div>
             {/* Next due */}
@@ -190,7 +195,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
                 ? 'bg-red-50 text-red-500'
                 : 'bg-slate-50 text-slate-500'
             }`}>
-              <Icon name="Clock" size={12} color={overdue && r.is_active ? '#ef4444' : '#94a3b8'} />
+              <Clock size={12} color={overdue && r.is_active ? '#ef4444' : '#94a3b8'} />
               {overdue && r.is_active ? 'ค้างชำระ · ' : 'ถัดไป · '}
               {r.next_due_date}
             </div>
@@ -209,11 +214,11 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
             </button>
             <button onClick={() => openEdit(r)}
               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
-              <Icon name="Pencil" size={12} color="#64748b" />
+              <Pencil size={12} color="#64748b" />
             </button>
             <button onClick={() => remove(r.id)}
               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-              <Icon name="Trash2" size={12} color="#94a3b8" />
+              <Trash2 size={12} color="#94a3b8" />
             </button>
           </div>
         </div>
@@ -234,7 +239,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
         </div>
         <button onClick={openAdd}
           className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
-          <Icon name="Plus" size={15} color="white" /> เพิ่มรายการ
+          <Plus size={15} color="white" /> เพิ่มรายการ
         </button>
       </div>
 
@@ -243,7 +248,7 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
         <div className="py-16 text-center text-slate-400 text-sm">กำลังโหลด...</div>
       ) : list.length === 0 ? (
         <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
-          <Icon name="RefreshCw" size={40} color="#cbd5e1" />
+          <RefreshCw size={40} color="#cbd5e1" />
           <p className="text-sm">ยังไม่มีรายการประจำ กดเพิ่มด้านบน</p>
         </div>
       ) : (
@@ -296,7 +301,9 @@ export default function RecurringView({ accounts, categories, onNotificationRefr
                       color:       form.type === t ? TYPE_COLOR[t] : '#64748b',
                       background:  form.type === t ? TYPE_BG[t]    : '#f8fafc',
                     }}>
-                    <Icon name={TYPE_ICON[t]} size={12} color={form.type === t ? TYPE_COLOR[t] : '#94a3b8'} />
+                    {TYPE_ICON[t] === 'ArrowUp' && <ArrowUp size={12} color={form.type === t ? TYPE_COLOR[t] : '#94a3b8'} />}
+                    {TYPE_ICON[t] === 'ArrowDown' && <ArrowDown size={12} color={form.type === t ? TYPE_COLOR[t] : '#94a3b8'} />}
+                    {TYPE_ICON[t] === 'ArrowLeftRight' && <ArrowLeftRight size={12} color={form.type === t ? TYPE_COLOR[t] : '#94a3b8'} />}
                     {TYPE_LABEL[t]}
                   </button>
                 ))}

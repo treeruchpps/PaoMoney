@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Icon from '../components/common/Icon';
+import { Sun, Calendar, BarChart2, TrendingUp, TrendingDown } from 'lucide-react';
 import { transactions as txApi, profile as profileApi } from '../services/api';
 import { fmt } from '../constants/data';
 
@@ -60,7 +61,7 @@ function getDateRange(period, weekStartDay) {
 // Thai-locale date string with Buddhist era (พ.ศ.)
 function thaiDay(dateStr) {
   // dateStr = "YYYY-MM-DD"
-  const [y, mo, d] = dateStr.split('-').map(Number);
+  const [, mo, d] = dateStr.split('-').map(Number);
   return `${d} ${THAI_MONTHS[mo - 1]}`;
 }
 function thaiYear(dateStr) {
@@ -263,7 +264,6 @@ export default function AnalyticsView({ accounts, categories }) {
   const totalLiab   = accounts.filter((a) => a.type === 'liability').reduce((s, a) => s + a.balance, 0);
   const netWorth    = totalAssets - totalLiab;
 
-  const income  = txList.filter((t) => t.type === 'income').reduce((s, t)  => s + t.amount, 0);
   const expense = txList.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
 
   const getCatName = (id) => {
@@ -348,7 +348,10 @@ export default function AnalyticsView({ accounts, categories }) {
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-xl flex items-center justify-center"
                     style={{ background: pc.bg }}>
-                    <Icon name={pc.icon} size={14} color={pc.color} />
+                    {pc.icon === 'Sun' && <Sun size={14} color={pc.color} />}
+                    {pc.icon === 'Calendar' && <Calendar size={14} color={pc.color} />}
+                    {pc.icon === 'BarChart2' && <BarChart2 size={14} color={pc.color} />}
+                    {pc.icon === 'TrendingUp' && <TrendingUp size={14} color={pc.color} />}
                   </div>
                   <span className="text-sm font-semibold" style={{ color: pc.color }}>{pc.label}</span>
                 </div>
@@ -451,11 +454,9 @@ export default function AnalyticsView({ accounts, categories }) {
                   <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
                     parseFloat(momChange) < 0 ? 'bg-emerald-50' : 'bg-red-50'
                   }`}>
-                    <Icon
-                      name={parseFloat(momChange) < 0 ? 'TrendingDown' : 'TrendingUp'}
-                      size={14}
-                      color={parseFloat(momChange) < 0 ? '#10b981' : '#ef4444'}
-                    />
+                    {parseFloat(momChange) < 0
+                      ? <TrendingDown size={14} color="#10b981" />
+                      : <TrendingUp size={14} color="#ef4444" />}
                   </div>
                   <p className="text-xs text-slate-600">
                     รายจ่ายเดือนนี้{' '}

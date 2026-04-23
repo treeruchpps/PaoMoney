@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
-import Icon from '../components/common/Icon';
+import { Plus, Edit, Trash2, AlertCircle, Wallet, CalendarDays, Calendar, CalendarRange } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { budgets as budgetsApi, transactions as txApi } from '../services/api';
 import { fmt } from '../constants/data';
 
 const getColor = (pct) => pct <= 50 ? '#10b981' : pct <= 80 ? '#f59e0b' : '#ef4444';
 const getBg    = (pct) => pct <= 50 ? '#f0fdf4' : pct <= 80 ? '#fefce8' : '#fff1f2';
-const PERIOD_LABEL = { monthly: 'รายเดือน', weekly: 'รายสัปดาห์', yearly: 'รายปี' };
+
+const PERIOD_CONFIG = {
+  weekly:  { label: 'รายสัปดาห์', icon: CalendarDays,  color: '#8b5cf6', bg: '#f5f3ff' },
+  monthly: { label: 'รายเดือน',   icon: Calendar,       color: '#3b82f6', bg: '#eff6ff' },
+  yearly:  { label: 'รายปี',      icon: CalendarRange,  color: '#10b981', bg: '#f0fdf4' },
+};
+const PERIOD_ORDER = ['weekly', 'monthly', 'yearly'];
 
 const pad2 = (n) => String(n).padStart(2, '0');
 
@@ -203,7 +209,7 @@ export default function BudgetsView({ categories }) {
         <h2 className="text-base font-semibold text-slate-700">งบแยกตามหมวดหมู่</h2>
         <button onClick={openCreate}
           className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
-          <Icon name="Plus" size={15} color="white" /> เพิ่มงบ
+          <Plus size={15} color="white" /> เพิ่มงบ
         </button>
       </div>
 
@@ -212,57 +218,81 @@ export default function BudgetsView({ categories }) {
         <div className="py-16 text-center text-slate-400 text-sm">กำลังโหลด...</div>
       ) : budgetList.length === 0 ? (
         <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
-          <Icon name="Wallet" size={40} color="#cbd5e1" />
+          <Wallet size={40} color="#cbd5e1" />
           <p className="text-sm">ยังไม่มีงบประมาณ กดเพิ่มด้านบน</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {budgetList.map((b) => {
-            const spent  = getSpent(b);
-            const pct    = b.amount > 0 ? Math.min(100, Math.round((spent / b.amount) * 100)) : 0;
-            const color  = getColor(pct);
-            const bg     = getBg(pct);
-            const remain = Math.max(0, b.amount - spent);
+        <div className="space-y-6">
+          {PERIOD_ORDER.map((period) => {
+            const group = budgetList.filter((b) => b.period === period);
+            if (group.length === 0) return null;
+            const pc = PERIOD_CONFIG[period];
+            const PeriodIcon = pc.icon;
             return (
-              <div key={b.id} className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 card-hover">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm text-slate-700 truncate">{b.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {getCatName(b.category_id)} · {PERIOD_LABEL[b.period] || b.period}
-                    </p>
+              <div key={period}>
+                {/* Section header */}
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-xl flex items-center justify-center"
+                    style={{ background: pc.bg }}>
+                    <PeriodIcon size={15} color={pc.color} />
                   </div>
-                  <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
-                    <span className="text-xs font-bold px-2 py-0.5 rounded-full"
-                      style={{ color, background: bg }}>{pct}%</span>
-                    <button onClick={() => openEdit(b)}
-                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
-                      <Icon name="Edit" size={11} color="#94a3b8" />
-                    </button>
-                    <button onClick={() => remove(b.id)}
-                      className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-                      <Icon name="Trash2" size={11} color="#94a3b8" />
-                    </button>
-                  </div>
+                  <h3 className="text-sm font-semibold" style={{ color: pc.color }}>{pc.label}</h3>
+                  <span className="text-xs text-slate-400">{group.length} รายการ</span>
                 </div>
 
-                {/* Progress bar */}
-                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, background: color }} />
-                </div>
+                {/* Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {group.map((b) => {
+                    const spent  = getSpent(b);
+                    const pct    = b.amount > 0 ? Math.min(100, Math.round((spent / b.amount) * 100)) : 0;
+                    const color  = getColor(pct);
+                    const bg     = getBg(pct);
+                    const remain = Math.max(0, b.amount - spent);
+                    return (
+                      <div key={b.id} className="bg-white rounded-2xl p-4 shadow-sm border card-hover"
+                        style={{ borderColor: pc.color + '22' }}>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-sm text-slate-700 truncate">{b.name}</p>
+                            {b.category_id && (
+                              <p className="text-xs text-slate-400 mt-0.5">{getCatName(b.category_id)}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0 ml-2">
+                            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+                              style={{ color, background: bg }}>{pct}%</span>
+                            <button onClick={() => openEdit(b)}
+                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
+                              <Edit size={11} color="#94a3b8" />
+                            </button>
+                            <button onClick={() => remove(b.id)}
+                              className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
+                              <Trash2 size={11} color="#94a3b8" />
+                            </button>
+                          </div>
+                        </div>
 
-                <div className="flex justify-between text-xs mt-1.5">
-                  <span style={{ color }}>฿{fmt(spent)} ใช้ไป</span>
-                  <span className="text-slate-400">คงเหลือ ฿{fmt(remain)} / ฿{fmt(b.amount)}</span>
-                </div>
+                        {/* Progress bar */}
+                        <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-500"
+                            style={{ width: `${pct}%`, background: color }} />
+                        </div>
 
-                {pct >= 100 && (
-                  <div className="mt-2 flex items-center gap-1.5 text-xs text-red-500 bg-red-50 px-2.5 py-1.5 rounded-lg">
-                    <Icon name="AlertCircle" size={12} color="#ef4444" />
-                    เกินงบประมาณ ฿{fmt(spent - b.amount)}
-                  </div>
-                )}
+                        <div className="flex justify-between text-xs mt-1.5">
+                          <span style={{ color }}>฿{fmt(spent)} ใช้ไป</span>
+                          <span className="text-slate-400">คงเหลือ ฿{fmt(remain)} / ฿{fmt(b.amount)}</span>
+                        </div>
+
+                        {pct >= 100 && (
+                          <div className="mt-2 flex items-center gap-1.5 text-xs text-red-500 bg-red-50 px-2.5 py-1.5 rounded-lg">
+                            <AlertCircle size={12} color="#ef4444" />
+                            เกินงบประมาณ ฿{fmt(spent - b.amount)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -301,7 +331,7 @@ export default function BudgetsView({ categories }) {
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700" />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">รอบ</label>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">ช่วงเวลางบประมาณ</label>
                 <select value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-700">
                   <option value="monthly">รายเดือน</option>

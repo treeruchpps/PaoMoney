@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { DollarSign, Shield, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import Icon from '../components/common/Icon';
 
 const WEEK_DAYS = [
   { value: 0, label: 'วันอาทิตย์' },
@@ -59,7 +59,7 @@ export default function RegisterPage({ onSwitch }) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Icon name="DollarSign" size={32} color="white" />
+            <DollarSign size={32} color="white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-800">PaoMoney</h1>
           <p className="text-slate-500 mt-1 text-sm">เริ่มต้นจัดการการเงินของคุณ</p>
@@ -71,7 +71,7 @@ export default function RegisterPage({ onSwitch }) {
 
           {displayError && (
             <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
-              <Icon name="Shield" size={16} color="#ef4444" />
+              <Shield size={16} color="#ef4444" />
               <p className="text-sm text-red-600">{displayError}</p>
             </div>
           )}
@@ -121,8 +121,8 @@ export default function RegisterPage({ onSwitch }) {
                   className="w-full px-4 pr-10 py-3 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
-                  {showPw ? 'ซ่อน' : 'แสดง'}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                  {showPw ? <Eye size={16} /> : <EyeOff size={16} />}
                 </button>
               </div>
             </div>

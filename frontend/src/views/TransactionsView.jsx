@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { ArrowUp, ArrowDown, ArrowLeftRight, Trash2, Edit, Search, X, Download, List, Calendar } from 'lucide-react';
 import Icon from '../components/common/Icon';
 import Modal from '../components/common/Modal';
 import { transactions as txApi, accounts as accountsApi } from '../services/api';
@@ -142,7 +143,19 @@ function CalendarView({ txList, filterMonth, getAcc, getCat, onRemove }) {
                           {TYPE_LABEL[tx.type]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-700">{cat?.name || '—'}</td>
+                      <td className="px-4 py-3">
+                        {cat ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                              style={{ background: (cat.color || '#3b82f6') + '22' }}>
+                              <Icon name={cat.icon || 'Tag'} size={11} color={cat.color || '#3b82f6'} />
+                            </div>
+                            <span className="text-xs text-slate-700">{cat.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs text-slate-500">
                         {tx.type === 'transfer'
                           ? `${acc?.name || '?'} → ${toAcc?.name || '?'}`
@@ -156,7 +169,7 @@ function CalendarView({ txList, filterMonth, getAcc, getCat, onRemove }) {
                       <td className="px-4 py-2">
                         <button onClick={() => onRemove(tx.id)}
                           className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-                          <Icon name="Trash2" size={11} color="#94a3b8" />
+                          <Trash2 size={11} color="#94a3b8" />
                         </button>
                       </td>
                     </tr>
@@ -469,28 +482,30 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
             <button key={t} onClick={() => openAdd(t)}
               className="text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 border"
               style={{ color: TYPE_COLOR[t], background: TYPE_BG[t], borderColor: TYPE_COLOR[t] + '33' }}>
-              <Icon name={TYPE_ICON[t]} size={13} color={TYPE_COLOR[t]} />
+              {TYPE_ICON[t] === 'ArrowUp' && <ArrowUp size={13} color={TYPE_COLOR[t]} />}
+              {TYPE_ICON[t] === 'ArrowDown' && <ArrowDown size={13} color={TYPE_COLOR[t]} />}
+              {TYPE_ICON[t] === 'ArrowLeftRight' && <ArrowLeftRight size={13} color={TYPE_COLOR[t]} />}
               {TYPE_LABEL[t]}
             </button>
           ))}
           {/* View toggle */}
           <div className="flex bg-slate-100 rounded-xl p-1 gap-0.5">
             {[
-              { mode: 'list',     icon: 'List',     title: 'รายการ' },
-              { mode: 'calendar', icon: 'Calendar', title: 'ปฏิทิน' },
-            ].map(({ mode, icon, title }) => (
+              { mode: 'list',     Icon: List,     title: 'รายการ' },
+              { mode: 'calendar', Icon: Calendar, title: 'ปฏิทิน' },
+            ].map(({ mode, Icon: IconComponent, title }) => (
               <button key={mode} onClick={() => setViewMode(mode)} title={title}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                   viewMode === mode ? 'bg-white shadow-sm text-blue-600' : 'text-slate-400 hover:text-slate-600'
                 }`}>
-                <Icon name={icon} size={15} color={viewMode === mode ? '#3b82f6' : '#94a3b8'} />
+                <IconComponent size={15} color={viewMode === mode ? '#3b82f6' : '#94a3b8'} />
               </button>
             ))}
           </div>
           {/* Export CSV */}
           <button onClick={exportCSV}
             className="text-xs px-3 py-2 rounded-xl font-medium flex items-center gap-1.5 border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors">
-            <Icon name="Download" size={13} color="#64748b" />
+            <Download size={13} color="#64748b" />
             Export CSV
           </button>
         </div>
@@ -517,7 +532,7 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
 
         {/* Search box */}
         <div className="flex items-center gap-2 border border-slate-200 rounded-xl px-3 py-2 bg-white flex-1 min-w-48">
-          <Icon name="Search" size={14} color="#94a3b8" />
+          <Search size={14} color="#94a3b8" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -526,7 +541,7 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
           />
           {search && (
             <button onClick={() => setSearch('')} className="text-slate-300 hover:text-slate-500">
-              <Icon name="X" size={13} color="#94a3b8" />
+              <X size={13} color="#94a3b8" />
             </button>
           )}
         </div>
@@ -601,7 +616,19 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
                           {TYPE_LABEL[tx.type]}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-slate-700 text-xs">{cat?.name || '—'}</td>
+                      <td className="px-4 py-3">
+                        {cat ? (
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
+                              style={{ background: (cat.color || '#3b82f6') + '22' }}>
+                              <Icon name={cat.icon || 'Tag'} size={11} color={cat.color || '#3b82f6'} />
+                            </div>
+                            <span className="text-xs text-slate-700">{cat.name}</span>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-xs text-slate-600">
                         {tx.type === 'transfer'
                           ? `${acc?.name || '?'} → ${toAcc?.name || '?'}`
@@ -616,11 +643,11 @@ export default function TransactionsView({ accounts, categories, onRefreshAccoun
                         <div className="flex gap-1">
                           <button onClick={() => openEdit(tx)}
                             className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
-                            <Icon name="Edit" size={11} color="#94a3b8" />
+                            <Edit size={11} color="#94a3b8" />
                           </button>
                           <button onClick={() => remove(tx.id)}
                             className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-                            <Icon name="Trash2" size={11} color="#94a3b8" />
+                            <Trash2 size={11} color="#94a3b8" />
                           </button>
                         </div>
                       </td>

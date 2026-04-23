@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Icon from '../components/common/Icon';
+import { DollarSign, Briefcase, Star, Smartphone, TrendingUp, CreditCard, Tag, Edit, Trash2, Share2, Plus } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { accounts as accountsApi, transactions as txApi } from '../services/api';
 import { fmt } from '../constants/data';
@@ -200,7 +200,13 @@ export default function AccountsView({ accounts, onRefresh }) {
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: k.color + '18' }}>
-              <Icon name={k.icon} size={22} color={k.color} />
+              {k.icon === 'DollarSign' && <DollarSign size={22} color={k.color} />}
+              {k.icon === 'Briefcase' && <Briefcase size={22} color={k.color} />}
+              {k.icon === 'Star' && <Star size={22} color={k.color} />}
+              {k.icon === 'Smartphone' && <Smartphone size={22} color={k.color} />}
+              {k.icon === 'TrendingUp' && <TrendingUp size={22} color={k.color} />}
+              {k.icon === 'CreditCard' && <CreditCard size={22} color={k.color} />}
+              {k.icon === 'Tag' && <Tag size={22} color={k.color} />}
             </div>
             <div>
               <p className="font-semibold text-slate-800">{acc.name}</p>
@@ -210,11 +216,11 @@ export default function AccountsView({ accounts, onRefresh }) {
           <div className="flex gap-1">
             <button onClick={() => openEdit(acc)}
               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
-              <Icon name="Edit" size={12} color="#64748b" />
+              <Edit size={12} color="#64748b" />
             </button>
             <button onClick={() => remove(acc.id)}
               className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-              <Icon name="Trash2" size={12} color="#94a3b8" />
+              <Trash2 size={12} color="#94a3b8" />
             </button>
           </div>
         </div>
@@ -257,13 +263,13 @@ export default function AccountsView({ accounts, onRefresh }) {
             <button onClick={openDist}
               className="text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium border-2 transition-colors"
               style={{ color: '#3b82f6', borderColor: '#bfdbfe', background: '#eff6ff' }}>
-              <Icon name="Share2" size={15} color="#3b82f6" />
+              <Share2 size={15} color="#3b82f6" />
               แบ่งเงินเข้ากระเป๋า
             </button>
           )}
           <button onClick={openAdd}
             className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
-            <Icon name="Plus" size={15} color="white" /> เพิ่มบัญชี
+            <Plus size={15} color="white" /> เพิ่มบัญชี
           </button>
         </div>
       </div>
@@ -290,7 +296,7 @@ export default function AccountsView({ accounts, onRefresh }) {
 
       {accounts.length === 0 && (
         <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
-          <Icon name="Briefcase" size={40} color="#cbd5e1" />
+          <Briefcase size={40} color="#cbd5e1" />
           <p className="text-sm">ยังไม่มีบัญชี กดเพิ่มบัญชีด้านบน</p>
         </div>
       )}
@@ -337,7 +343,13 @@ export default function AccountsView({ accounts, onRefresh }) {
                       borderColor: form.kind === k.value ? k.color : '#e2e8f0',
                       background:  form.kind === k.value ? k.color + '15' : '#f8fafc',
                     }}>
-                    <Icon name={k.icon} size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />
+                    {k.icon === 'DollarSign' && <DollarSign size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'Briefcase' && <Briefcase size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'Star' && <Star size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'Smartphone' && <Smartphone size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'TrendingUp' && <TrendingUp size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'CreditCard' && <CreditCard size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
+                    {k.icon === 'Tag' && <Tag size={18} color={form.kind === k.value ? k.color : '#94a3b8'} />}
                     <span className="text-xs leading-tight text-center"
                       style={{ color: form.kind === k.value ? k.color : '#64748b' }}>
                       {k.label}
@@ -449,7 +461,13 @@ export default function AccountsView({ accounts, onRefresh }) {
                       {/* Icon */}
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{ background: k.color + '18' }}>
-                        <Icon name={k.icon} size={18} color={k.color} />
+                        {k.icon === 'DollarSign' && <DollarSign size={18} color={k.color} />}
+                        {k.icon === 'Briefcase' && <Briefcase size={18} color={k.color} />}
+                        {k.icon === 'Star' && <Star size={18} color={k.color} />}
+                        {k.icon === 'Smartphone' && <Smartphone size={18} color={k.color} />}
+                        {k.icon === 'TrendingUp' && <TrendingUp size={18} color={k.color} />}
+                        {k.icon === 'CreditCard' && <CreditCard size={18} color={k.color} />}
+                        {k.icon === 'Tag' && <Tag size={18} color={k.color} />}
                       </div>
                       {/* Name */}
                       <div className="flex-1 min-w-0">
@@ -469,7 +487,7 @@ export default function AccountsView({ accounts, onRefresh }) {
                           <button onClick={() => fillRemaining(idx)}
                             title="เติมยอดที่เหลือ"
                             className="w-6 h-6 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors flex-shrink-0">
-                            <Icon name="Plus" size={11} color="#3b82f6" />
+                            <Plus size={11} color="#3b82f6" />
                           </button>
                         )}
                       </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { DollarSign, Eye, EyeOff, ShieldUser, KeyRound } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import Icon from '../components/common/Icon';
 
 export default function LoginPage({ onSwitch }) {
   const { login, loading, error, clearError } = useAuth();
@@ -23,7 +23,7 @@ export default function LoginPage({ onSwitch }) {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg">
-            <Icon name="DollarSign" size={32} color="white" />
+            <DollarSign size={32} color="white" />
           </div>
           <h1 className="text-3xl font-bold text-slate-800">PaoMoney</h1>
           <p className="text-slate-500 mt-1 text-sm">จัดการการเงินส่วนตัวได้ง่ายๆ</p>
@@ -35,7 +35,7 @@ export default function LoginPage({ onSwitch }) {
 
           {error && (
             <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 flex items-center gap-2">
-              <Icon name="Shield" size={16} color="#ef4444" />
+              <KeyRound size={16} color="#ef4444" />
               <p className="text-sm text-red-600">{error}</p>
             </div>
           )}
@@ -45,7 +45,7 @@ export default function LoginPage({ onSwitch }) {
               <label className="text-xs font-semibold text-slate-500 mb-1.5 block">อีเมล</label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Icon name="Star" size={16} color="#94a3b8" />
+                  <ShieldUser size={16} color="#94a3b8" />
                 </div>
                 <input
                   type="email"
@@ -63,7 +63,7 @@ export default function LoginPage({ onSwitch }) {
               <label className="text-xs font-semibold text-slate-500 mb-1.5 block">รหัสผ่าน</label>
               <div className="relative">
                 <div className="absolute left-3 top-1/2 -translate-y-1/2">
-                  <Icon name="Shield" size={16} color="#94a3b8" />
+                  <KeyRound size={16} color="#94a3b8" />
                 </div>
                 <input
                   type={showPw ? 'text' : 'password'}
@@ -76,7 +76,7 @@ export default function LoginPage({ onSwitch }) {
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                  <Icon name={showPw ? 'TrendingUp' : 'TrendingDown'} size={16} color="currentColor" />
+                  {showPw ? <Eye size={16} color="currentColor" /> : <EyeOff size={16} color="currentColor" />}
                 </button>
               </div>
             </div>

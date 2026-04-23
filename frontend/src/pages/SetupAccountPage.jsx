@@ -1,4 +1,4 @@
-import Icon from '../components/common/Icon';
+import { Wallet } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SetupAccountPage({ onComplete }) {
@@ -10,7 +10,7 @@ export default function SetupAccountPage({ onComplete }) {
 
         {/* Logo */}
         <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mx-auto mb-6 shadow-xl">
-          <Icon name="Wallet" size={38} color="white" />
+          <Wallet size={38} color="white" />
         </div>
 
         {/* Welcome text */}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Icon from '../components/common/Icon';
+import { Plus, Edit, Trash2, Wallet, Calendar, CheckCircle, PiggyBank, Target } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { savingsGoals as goalsApi } from '../services/api';
 import { fmt } from '../constants/data';
@@ -172,7 +173,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
         <h2 className="text-base font-semibold text-slate-700">เป้าหมายการออม</h2>
         <button onClick={openCreate}
           className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
-          <Icon name="Plus" size={15} color="white" /> เพิ่มเป้าหมาย
+          <Plus size={15} color="white" /> เพิ่มเป้าหมาย
         </button>
       </div>
 
@@ -181,7 +182,8 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
         <div className="py-16 text-center text-slate-400 text-sm">กำลังโหลด...</div>
       ) : goals.length === 0 ? (
         <div className="py-20 flex flex-col items-center gap-3 text-slate-400">
-          <Icon name="Target" size={40} color="#cbd5e1" />
+          {/* Using Icon for dynamic icon */}
+          <Target size={40} color="#cbd5e1" />
           <p className="text-sm">ยังไม่มีเป้าหมาย กดเพิ่มด้านบน</p>
         </div>
       ) : (
@@ -219,12 +221,12 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                     {!isDone && (
                       <button onClick={() => openEdit(g)}
                         className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-blue-100 flex items-center justify-center transition-colors">
-                        <Icon name="Edit" size={11} color="#94a3b8" />
+                        <Edit size={11} color="#94a3b8" />
                       </button>
                     )}
                     <button onClick={() => remove(g.id)}
                       className="w-6 h-6 rounded-lg bg-slate-100 hover:bg-red-100 flex items-center justify-center transition-colors">
-                      <Icon name="Trash2" size={11} color="#94a3b8" />
+                      <Trash2 size={11} color="#94a3b8" />
                     </button>
                   </div>
                 </div>
@@ -251,13 +253,13 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                     <div className="flex items-center gap-2">
                       {acc && (
                         <div className="flex items-center gap-1 text-xs text-slate-500 bg-slate-50 rounded-xl px-2.5 py-2">
-                          <Icon name="Wallet" size={11} color="#3b82f6" />
+                          <Wallet size={11} color="#3b82f6" />
                           {acc.name}
                         </div>
                       )}
                       {g.deadline && (
                         <div className="flex items-center gap-1 text-xs text-slate-400 bg-slate-50 rounded-xl px-2.5 py-2">
-                          <Icon name="Calendar" size={11} color="#94a3b8" />
+                          <Calendar size={11} color="#94a3b8" />
                           {g.deadline.slice(0, 10)}
                         </div>
                       )}
@@ -265,7 +267,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 bg-emerald-50 rounded-xl px-3 py-2.5">
-                    <Icon name="CheckCircle" size={16} color="#10b981" />
+                    <CheckCircle size={16} color="#10b981" />
                     <p className="text-xs text-emerald-600 font-medium">บรรลุเป้าหมายแล้ว! 🎉</p>
                   </div>
                 )}
@@ -276,7 +278,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                     className="w-full mt-3 py-2 rounded-xl text-sm font-semibold text-white transition-opacity hover:opacity-90"
                     style={{ background: color }}>
                     <span className="flex items-center justify-center gap-2">
-                      <Icon name="PiggyBank" size={15} color="white" />
+                      <PiggyBank size={15} color="white" />
                       ฝากเงิน
                     </span>
                   </button>
@@ -389,7 +391,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
             {justCompleted ? (
               <div className="py-6 flex flex-col items-center gap-3 text-center">
                 <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Icon name="CheckCircle" size={36} color="#10b981" />
+                  <CheckCircle size={36} color="#10b981" />
                 </div>
                 <p className="text-lg font-bold text-slate-800">บรรลุเป้าหมายแล้ว! 🎉</p>
                 <p className="text-sm text-slate-500">{depositGoal.name} ครบตามเป้าหมายแล้ว</p>
@@ -475,7 +477,7 @@ export default function GoalsView({ accounts, onRefreshAccounts }) {
                   <button onClick={doDeposit} disabled={depositSaving}
                     className="flex-1 text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-60 flex items-center justify-center gap-2"
                     style={{ background: depositGoal.color || '#3b82f6' }}>
-                    <Icon name="PiggyBank" size={15} color="white" />
+                    <PiggyBank size={15} color="white" />
                     {depositSaving ? 'กำลังบันทึก...' : 'ฝากเงิน'}
                   </button>
                 </div>

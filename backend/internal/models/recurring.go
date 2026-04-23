@@ -51,6 +51,7 @@ type Notification struct {
 	ID          string    `json:"id"`
 	UserID      string    `json:"user_id"`
 	RecurringID *string   `json:"recurring_id"`
+	BudgetID    *string   `json:"budget_id"`
 	Title       string    `json:"title"`
 	Message     *string   `json:"message"`
 	IsRead      bool      `json:"is_read"`

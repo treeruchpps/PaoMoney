@@ -1,3 +1,4 @@
+import { DollarSign, Menu, LogOut } from 'lucide-react';
 import Icon from '../common/Icon';
 import { NAV, fmt } from '../../constants/data';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,7 +22,7 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
           className="flex items-center gap-3 hover:opacity-80 transition-opacity"
         >
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: accent }}>
-            <Icon name="DollarSign" size={18} color="white" />
+            <DollarSign size={18} color="white" />
           </div>
           {!collapsed && <span className="text-base font-bold" style={{ color: accent }}>PaoMoney</span>}
         </button>
@@ -29,9 +30,9 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
 
       {/* User info */}
       {!collapsed && (
-        <div className="mx-3 mb-3 p-3 rounded-xl bg-slate-50">
+        <div className="mx-3 mb-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ background: accent }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold ring-2 ring-white ring-offset-1" style={{ background: accent, boxShadow: `0 0 0 2px ${accent}40` }}>
               {initials}
             </div>
             <div className="flex-1 min-w-0">
@@ -65,14 +66,14 @@ export default function Sidebar({ view, setView, accounts, collapsed, setCollaps
           onClick={() => setCollapsed((c) => !c)}
           className="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400"
         >
-          <Icon name="Menu" size={17} />
+          <Menu size={17} />
           {!collapsed && <span>ย่อแถบเมนู</span>}
         </button>
         <button
           onClick={logout}
           className="sidebar-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-slate-400 hover:text-red-500 transition-colors"
         >
-          <Icon name="LogOut" size={17} />
+          <LogOut size={17} />
           {!collapsed && <span>ออกจากระบบ</span>}
         </button>
       </div>

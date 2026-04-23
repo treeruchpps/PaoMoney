@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Icon from '../components/common/Icon';
+import { Plus, GripVertical, X } from 'lucide-react';
 import Modal from '../components/common/Modal';
 import { categories as categoriesApi } from '../services/api';
 
@@ -139,7 +140,7 @@ export default function CategoriesView({ onRefresh }) {
         </div>
         <button onClick={openModal}
           className="btn-primary text-white text-sm px-4 py-2 rounded-xl flex items-center gap-2 font-medium">
-          <Icon name="Plus" size={15} color="white" /> เพิ่มหมวดหมู่
+          <Plus size={15} color="white" /> เพิ่มหมวดหมู่
         </button>
       </div>
 
@@ -173,7 +174,7 @@ export default function CategoriesView({ onRefresh }) {
               >
                 {/* Drag handle — แสดงตอน hover */}
                 <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-40 transition-opacity">
-                  <Icon name="GripVertical" size={12} color="#94a3b8" />
+                  <GripVertical size={12} color="#94a3b8" />
                 </div>
 
                 <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
@@ -189,7 +190,7 @@ export default function CategoriesView({ onRefresh }) {
                     onClick={(e) => { e.stopPropagation(); remove(c.id); }}
                     className="absolute top-2 right-2 w-5 h-5 rounded-full bg-red-100 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                     style={{ cursor: 'default' }}>
-                    <Icon name="X" size={10} color="#ef4444" />
+                    <X size={10} color="#ef4444" />
                   </button>
                 )}
               </div>
@@ -200,7 +201,7 @@ export default function CategoriesView({ onRefresh }) {
           <div onClick={openModal}
             className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-4 flex flex-col items-center gap-2.5 cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-all">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-slate-100">
-              <Icon name="Plus" size={22} color="#94a3b8" />
+              <Plus size={22} color="#94a3b8" />
             </div>
             <p className="text-xs text-slate-400">เพิ่มใหม่</p>
           </div>

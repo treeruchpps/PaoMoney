@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import Icon from '../components/common/Icon';
+import { Camera, X, User, Lock, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { profile as profileApi, auth as authApi } from '../services/api';
 
@@ -134,7 +134,7 @@ export default function ProfileView() {
           )}
           {/* Overlay */}
           <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Icon name="Camera" size={22} color="white" />
+            <Camera size={22} color="white" />
           </div>
           {/* Remove button */}
           {avatarUrl && (
@@ -142,7 +142,7 @@ export default function ProfileView() {
               onClick={(e) => { e.stopPropagation(); setAvatarUrl(''); }}
               className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 flex items-center justify-center shadow"
             >
-              <Icon name="X" size={10} color="white" />
+              <X size={10} color="white" />
             </button>
           )}
         </div>
@@ -167,7 +167,7 @@ export default function ProfileView() {
       {/* ── ข้อมูลส่วนตัว ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <Icon name="User" size={16} color={accent} /> ข้อมูลส่วนตัว
+          <User size={16} color={accent} /> ข้อมูลส่วนตัว
         </h2>
 
         <div className="grid grid-cols-2 gap-4">
@@ -220,7 +220,7 @@ export default function ProfileView() {
       {/* ── เปลี่ยนรหัสผ่าน ───────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4">
         <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-          <Icon name="Lock" size={16} color={accent} /> เปลี่ยนรหัสผ่าน
+          <Lock size={16} color={accent} /> เปลี่ยนรหัสผ่าน
         </h2>
 
         <div>
@@ -260,12 +260,12 @@ export default function ProfileView() {
       {/* ── ออกจากระบบ ────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-6">
         <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2 mb-3">
-          <Icon name="LogOut" size={16} color="#ef4444" /> ออกจากระบบ
+          <LogOut size={16} color="#ef4444" /> ออกจากระบบ
         </h2>
         <p className="text-xs text-slate-400 mb-4">ระบบจะล้างข้อมูล session ทั้งหมดออกจากอุปกรณ์นี้</p>
         <button onClick={logout}
           className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-red-500 hover:bg-red-600 transition-colors flex items-center gap-2">
-          <Icon name="LogOut" size={14} color="white" />
+          <LogOut size={14} color="white" />
           ออกจากระบบ
         </button>
       </div>

@@ -172,6 +172,7 @@ CREATE TABLE notifications (
     id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id        UUID             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     recurring_id   UUID             REFERENCES recurring_transactions(id) ON DELETE CASCADE,
+    budget_id      UUID             REFERENCES budgets(id) ON DELETE CASCADE,
     title          VARCHAR(200)     NOT NULL,
     message        TEXT,
     is_read        BOOLEAN          NOT NULL DEFAULT FALSE,

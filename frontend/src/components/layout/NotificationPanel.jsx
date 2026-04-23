@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import Icon from '../common/Icon';
+import { BellOff, AlertTriangle, RefreshCw } from 'lucide-react';
 import { notifications as notiApi } from '../../services/api';
 import { fmt } from '../../constants/data';
 
@@ -63,49 +63,72 @@ export default function NotificationPanel({ list, onClose, onRefresh, onRefreshA
       <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-50">
         {list.length === 0 ? (
           <div className="py-12 flex flex-col items-center gap-2 text-slate-400">
-            <Icon name="BellOff" size={32} color="#cbd5e1" />
+            <BellOff size={32} color="#cbd5e1" />
             <p className="text-sm">ไม่มีการแจ้งเตือน</p>
           </div>
         ) : (
-          list.map((n) => (
-            <div key={n.id}
-              className={`px-5 py-4 transition-colors ${n.is_read ? 'bg-white' : 'bg-blue-50/40'}`}>
-              {/* Title + dot */}
-              <div className="flex items-start gap-2 mb-3">
-                {!n.is_read && (
-                  <div className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
-                )}
-                <div className={!n.is_read ? '' : 'ml-4'}>
-                  <p className="text-sm font-semibold text-slate-800">{n.title}</p>
-                  {n.message && (
-                    <p className="text-xs text-slate-400 mt-0.5">{n.message}</p>
-                  )}
-                  <p className="text-xs text-slate-300 mt-1">
-                    {new Date(n.created_at).toLocaleDateString('th-TH', {
-                      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-                    })}
-                  </p>
-                </div>
-              </div>
+          list.map((n) => {
+            const isBudget    = !!n.budget_id;
+            const isRecurring = !!n.recurring_id;
+            const dotColor    = isBudget ? '#f59e0b' : '#3b82f6';
+            const bgColor     = n.is_read ? 'bg-white' : isBudget ? 'bg-amber-50/50' : 'bg-blue-50/40';
 
-              {/* Actions */}
-              {n.recurring_id && (
-                <div className="flex gap-2 ml-4">
-                  <button onClick={() => confirm(n.id)}
-                    className="flex-1 text-xs py-2 rounded-xl font-semibold transition-colors"
-                    style={{ background: '#eff6ff', color: '#3b82f6' }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}>
-                    ✓ บันทึกรายการ
-                  </button>
-                  <button onClick={() => skip(n.id)}
-                    className="flex-1 text-xs py-2 rounded-xl font-medium bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
-                    ข้ามรอบนี้
-                  </button>
+            return (
+              <div key={n.id} className={`px-5 py-4 transition-colors ${bgColor}`}>
+                {/* Icon + Title */}
+                <div className="flex items-start gap-2 mb-3">
+                  {/* type icon */}
+                  <div className="flex-shrink-0 mt-0.5">
+                    {isBudget
+                      ? <AlertTriangle size={15} color="#f59e0b" />
+                      : <RefreshCw    size={15} color="#3b82f6" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      {!n.is_read && (
+                        <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                          style={{ background: dotColor }} />
+                      )}
+                      <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                    </div>
+                    {n.message && (
+                      <p className="text-xs text-slate-400 mt-0.5">{n.message}</p>
+                    )}
+                    <p className="text-xs text-slate-300 mt-1">
+                      {new Date(n.created_at).toLocaleDateString('th-TH', {
+                        day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                      })}
+                    </p>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))
+
+                {/* Actions */}
+                {isRecurring && (
+                  <div className="flex gap-2 ml-6">
+                    <button onClick={() => confirm(n.id)}
+                      className="flex-1 text-xs py-2 rounded-xl font-semibold transition-colors"
+                      style={{ background: '#eff6ff', color: '#3b82f6' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#bfdbfe'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}>
+                      ✓ บันทึกรายการ
+                    </button>
+                    <button onClick={() => skip(n.id)}
+                      className="flex-1 text-xs py-2 rounded-xl font-medium bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">
+                      ข้ามรอบนี้
+                    </button>
+                  </div>
+                )}
+                {isBudget && (
+                  <div className="ml-6">
+                    <button onClick={() => skip(n.id)}
+                      className="text-xs px-3 py-1.5 rounded-xl font-medium bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors border border-amber-200">
+                      ปิดการแจ้งเตือน
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import Icon from './Icon';
+import { X } from 'lucide-react';
 
 export default function Modal({ title, onClose, children }) {
   return createPortal(
@@ -14,7 +14,7 @@ export default function Modal({ title, onClose, children }) {
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
           >
-            <Icon name="X" size={18} />
+            <X size={18} />
           </button>
         </div>
         <div className="px-6 py-4">{children}</div>
